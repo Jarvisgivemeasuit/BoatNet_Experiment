@@ -12,6 +12,7 @@ class Args:
         self.backbone = 'resnet50'
         self.epochs = 80
         self.lr = 0.1
+        self.no_val = False
 
         self.gpu_ids = [0, 1]
         self.gpu_id = '0, 1'
@@ -19,4 +20,4 @@ class Args:
         self.cuda = torch.cuda.is_available()
         self.apex = True
 
-        self.no_val = False
+        self.vis_image_dir = '/home/arron/Documents/grey/paper/experiment/vis_image'

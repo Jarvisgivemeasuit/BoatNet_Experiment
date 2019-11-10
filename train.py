@@ -33,6 +33,8 @@ class Trainer:
         self.best_miou = 0
 
         train_set, val_set, self.num_classes = make_dataset(self.args.tr_batch_size, self.args.vd_batch_size)
+        self.mean = train_set.mean
+        self.std = train_set.std
         self.train_loader = DataLoader(train_set, batch_size=self.args.tr_batch_size,
                                        shuffle=True, num_workers=self.args.num_workers)
         self.val_loader = DataLoader(val_set, batch_size=self.args.vd_batch_size,
@@ -178,8 +180,7 @@ class Trainer:
     def get_lr(self):
         return self.optimizer.param_groups[0]['lr']
 
-    def visualize_batch_image(self, image, target, output,
-                              epoch, batch_index):
+    def visualize_batch_image(self, image, target, output, epoch, batch_index):
         # image (B,C,H,W) To (B,H,W,C)
         image_np = image.cpu().numpy()
         image_np = np.transpose(image_np, axes=[0, 2, 3, 1])
@@ -207,9 +208,9 @@ class Trainer:
             plt.imshow(target_rgb_tmp, vmin=0, vmax=255)
             plt.subplot(133)
             plt.imshow(output_rgb_tmp, vmin=0, vmax=255)
-            path = os.path.join(self.saver.experiment_dir, "vis_image", f'epoch_{epoch}')
-            make_sure_path_exists(path)
-            plt.savefig(f"{path}/{batch_index}-{i}.jpg")
+            save_path = os.path.join(self.args.vis_image_dir, f'epoch_{epoch}')
+            make_sure_path_exists(save_path)
+            plt.savefig(f"{save_path}/{batch_index}-{i}.jpg")
             plt.close('all')
 
     
