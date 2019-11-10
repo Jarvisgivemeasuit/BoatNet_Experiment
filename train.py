@@ -82,6 +82,7 @@ class Trainer:
             self.optimizer.zero_grad()
             output = self.net(img)
             loss = self.criterion(output, tar)
+            losses.update(loss.item())
 
             self.train_metric.pixacc.update(output, tar)
             self.train_metric.miou.update(output, tar)
@@ -92,7 +93,6 @@ class Trainer:
                     scale_loss.backward()
             else:
                 loss.backward()
-            losses.update(loss.item())
             self.optimizer.step()
 
             batch_time.update(time.time() - starttime)
@@ -189,6 +189,7 @@ class Trainer:
         image_np += self.mean
         image_np *= 255.0
         image_np = image_np.astype(np.uint8)
+        image_np = image_np[:, :, :, 1:]
 
         # target (B,H,W)
         target = target.cpu().numpy()
