@@ -4,7 +4,7 @@ class Args:
 
     def __init__(self):
         self.tr_batch_size = 8
-        self.vd_batch_size = 8
+        self.vd_batch_size = 12
         self.num_workers = 8
         self.inplanes = 4
 
@@ -20,4 +20,4 @@ class Args:
         self.cuda = torch.cuda.is_available()
         self.apex = True
 
-        self.vis_image_dir = '/home/arron/Documents/grey/paper/experiment/vis_image'
+        self.vis_image_dir = '/home/arron/Documents/grey/paper/experiment/vis_image/'

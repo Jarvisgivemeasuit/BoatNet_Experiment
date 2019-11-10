@@ -6,12 +6,13 @@ from pprint import pprint
 from collections import namedtuple
 from progress.bar import Bar, ShadyBar
 from apex import amp
+from PIL import Image
 
 sys.path.append("/home/arron/Documents/grey/paper/experiment")
 
 import utils.metrics as metrics
 from utils.args import Args
-from utils.utils import AverageMeter, make_dataset
+from utils.utils import *
 from model import get_model, save_model
 from dataset.rssrai import Rssrai
 
@@ -148,7 +149,7 @@ class Trainer:
             self.val_metric.miou.update(output, tar)
             self.val_metric.kappa.update(output, tar)
 
-            self.visualize_batch_image(image, target, output, epoch, batch_idx)
+            self.visualize_batch_image(img, tar, output, epoch, idx)
             
             batch_time.update(time.time() - starttime)
             starttime = time.time()
