@@ -20,4 +20,4 @@ class Args:
         self.cuda = torch.cuda.is_available()
         self.apex = True
 
-        self.vis_image_dir = '/home/arron/Documents/grey/paper/experiment/vis_image/'
+        self.vis_image_dir = '/home/arron/Documents/grey/paper/vis_image/'
