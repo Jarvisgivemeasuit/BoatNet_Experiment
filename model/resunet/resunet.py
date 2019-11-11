@@ -94,23 +94,32 @@ class Up(nn.Module):
         x = self.conv(x)
         return x
 
+class ChDecrease(nn.Module):
+    def __init__(self, inplanes):
+        super().__init__()
+        self.conv1x1 = nn.Conv2d(inplanes, inplanes // 4, kernel_size=1)
+
+    def forward(self, x):
+        x = self.conv1x1(x)
+        return x
+
 class unet(nn.Module):
     def __init__(self, inplanes, num_classes, backbone):
         super(unet, self).__init__()
         self.down = ResDown(in_channels=inplanes, backbone=backbone)
+        self.list = None
 
-        if BACKBONE == 'resnet18' or BACKBONE == 'resnet34':
-            self.up1 = Up(768, 256)
-            self.up2 = Up(384, 128)
-            self.up3 = Up(192, 64)
-            self.up4 = Up(128, 64, last_cat=True)
-            self.outconv = nn.Conv2d(64, num_classes, 1)
-        else:
-            self.up1 = Up(3072, 1024)
-            self.up2 = Up(1536, 512)
-            self.up3 = Up(768, 256)
-            self.up4 = Up(320, 128, last_cat=True)
-            self.outconv = nn.Conv2d(128, num_classes, 1)
+        if not (BACKBONE == 'resnet18' or BACKBONE == 'resnet34'):
+            self.de1 = ChDecrease(256)
+            self.de2 = ChDecrease(512)
+            self.de3 = ChDecrease(1024)
+            self.de4 = ChDecrease(2048)
+                
+        self.up1 = Up(768, 256)
+        self.up2 = Up(384, 128)
+        self.up3 = Up(192, 64)
+        self.up4 = Up(128, 64, last_cat=True)
+        self.outconv = nn.Conv2d(64, num_classes, 1)
 
         # self.up = Up(576, 64)
         # self.outconv = nn.Conv2d(64, num_classes, 1)
@@ -118,6 +127,11 @@ class unet(nn.Module):
     def forward(self, x):
         self.x0, self.x1, self.x2, self.x3, self.x4 = self.down(x)
         # print(self.x0.shape, self.x1.shape, self.x2.shape, self.x3.shape, self.x4.shape)
+        if not (BACKBONE == 'resnet18' or BACKBONE == 'resnet34'):
+            self.x1 = self.de1(self.x1)
+            self.x2 = self.de2(self.x2)
+            self.x3 = self.de3(self.x3)
+            self.x4 = self.de4(self.x4)
 
         x = self.up1(self.x4, self.x3)
         x = self.up2(x, self.x2)
