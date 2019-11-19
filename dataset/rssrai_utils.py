@@ -229,10 +229,35 @@ def transpose_test_img_to_numpy(data_path, save_path):
     bar.finish()
 
 
+def fore_back(path_dict):
+    img_list = os.listdir(path_dict['data_path'])
+    num_imgs = len(img_list)
+    bar = Bar('Saving binary file:', max=num_imgs)
+    for i, img_file in enumerate(img_list):
+        img_np = np.load(os.path.join(path_dict['data_path'], img_file))
+        
+        back = (img_np['label'] == 15).sum()
+        rate = (img_np['label'].size - back) / img_np['label'].size
+        
+        mask = np.ones(img_np['label'].shape)
+        mask[np.where(img_np['label'] == 15)] = 0
+        
+        save_name = '_'.join([img_file.replace('.npz', ''),'{:.4f}'.format(rate)])
+        
+        np.savez(os.path.join(path_dict['save_path'], save_name),{'image':img_np['image'], 'label':mask})
+        bar.suffix = f'{i + 1} / {num_imgs}'
+        bar.next()
+    bar.finish()
+
+
 if __name__ == '__main__':
     path_dict = {}
-    path_dict['data_path'] = '/home/arron/dataset/rssrai2019/test/test_numpy'
-    path_dict['save_path'] = '/home/arron/dataset/rssrai2019/test/test_split'
-    path_dict['img_format'] = '.npy'
-    spliter = ImageSpliter(path_dict, (900, 850))
-    spliter.split_image()
+    # path_dict['data_path'] = '/home/arron/dataset/rssrai2019/test/test_numpy'
+    # path_dict['save_path'] = '/home/arron/dataset/rssrai2019/test/test_split'
+    # spliter = ImageSpliter(path_dict, (900, 850))
+    # spliter.split_image()
+    
+    
+    path_dict['data_path'] = '/home/arron/dataset/rssrai2019/train_numpy_256'
+    path_dict['save_path'] = '/home/arron/Documents/grey/paper/binary_label'
+    fore_back(path_dict)

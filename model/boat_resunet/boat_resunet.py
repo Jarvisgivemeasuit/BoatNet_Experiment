@@ -52,6 +52,19 @@ class ResDown(nn.Module):
         return output0, output1, output2, output3, output4
 
 
+class Pred_Fore_Rate(nn.Module):
+    def __init__(self, inplanes, planes):
+        super().__init__()
+        self.conv1x1 = nn.Conv2d(inplanes, planes, 1)
+        self.pool = nn.AdaptiveAvgPool2d((1, 1))
+
+    def forward(self, x):
+        x = self.conv1x1(x)
+        x = self.pool(x)
+
+        return x
+
+
 class Double_conv(nn.Module):
     '''(conv => BN => ReLU) * 2'''
     def __init__(self, inplanes, planes):
@@ -94,54 +107,98 @@ class Up(nn.Module):
         x = self.conv(x)
         return x
 
-class Fg_pred(nn.Module):
+class ChDecrease(nn.Module):
     def __init__(self, inplanes):
         super().__init__()
-        self.conv1x1 = nn.Conv2d(inplanes, 2)
-        self.pool = nn.AdaptiveAvgPool2d((1, 1))
+        self.conv1x1 = nn.Conv2d(inplanes, inplanes // 4, kernel_size=1)
 
     def forward(self, x):
         x = self.conv1x1(x)
-        x = self.pool(x)
         return x
 
-class sec_Up(nn.Module):
-    def __init__(self, inplanes):
-        super().__init__()
-        self.down = nn.Conv2d(inplanes, planes, stride=8)
-        
-class unet(nn.Module):
+class Boat_Unet_part1(nn.Module):
     def __init__(self, inplanes, num_classes, backbone):
         super(unet, self).__init__()
         self.down = ResDown(in_channels=inplanes, backbone=backbone)
+        self.fore_pred = Pred_Fore_Rate(512, 2)
+        self.list = None
 
-        if BACKBONE == 'resnet18' or BACKBONE == 'resnet34':
-            self.up1 = Up(768, 256)
-            self.up2 = Up(384, 128)
-            self.up3 = Up(192, 64)
-            self.up4 = Up(128, 64, last_cat=True)
-            self.outconv = nn.Conv2d(64, num_classes, 1)
-        else:
-            self.up1 = Up(3072, 1024)
-            self.up2 = Up(1536, 512)
-            self.up3 = Up(768, 256)
-            self.up4 = Up(320, 128, last_cat=True)
-            self.outconv = nn.Conv2d(128, num_classes, 1)
+        if not (BACKBONE == 'resnet18' or BACKBONE == 'resnet34'):
+            self.de1 = ChDecrease(256)
+            self.de2 = ChDecrease(512)
+            self.de3 = ChDecrease(1024)
+            self.de4 = ChDecrease(2048)
+                
+        self.up1 = Up(768, 256)
+        self.up2 = Up(384, 128)
+        self.up3 = Up(192, 64)
+        self.up4 = Up(128, 64, last_cat=True)
+        self.outconv = nn.Conv2d(64, num_classes, 1)
 
-        # self.up = Up(576, 64)
-        # self.outconv = nn.Conv2d(64, num_classes, 1)
+        self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
-        self.x0, self.x1, self.x2, self.x3, self.x4 = self.down(x)
-        # print(self.x0.shape, self.x1.shape, self.x2.shape, self.x3.shape, self.x4.shape)
+        x0, x1, x2, x3, x4 = self.down(x)
+        rate = self.fore_pred()
+        # print(x0.shape, x1.shape, x2.shape, x3.shape, x4.shape)
+        if not (BACKBONE == 'resnet18' or BACKBONE == 'resnet34'):
+            x1 = self.de1(self.x1)
+            x2 = self.de2(self.x2)
+            x3 = self.de3(self.x3)
+            x4 = self.de4(self.x4)
 
         x = self.up1(self.x4, self.x3)
         x = self.up2(x, self.x2)
         x = self.up3(x, self.x1)
         x = self.up4(x, self.x0)
+        output = self.outconv(x)
 
-        x = self.outconv(x)
+        x = sigmoid(output)
+        fore_output = (x > rate).byte()
+        output = torch.cat(output, fore_output)
 
-        # x = self.up(self.x4, self.x0)
-        # x = self.outconv(x)
-        return x
+        return fore_output, output
+    
+    
+class Boat_Unet_part2(nn.Module):
+    def __init__(self, inplanes, num_classes, backbone):
+        super(unet, self).__init__()
+        self.down = ResDown(in_channels=inplanes, backbone=backbone)
+        self.fore_pred = Pred_Fore_Rate(512, 2)
+        self.list = None
+
+        if not (BACKBONE == 'resnet18' or BACKBONE == 'resnet34'):
+            self.de1 = ChDecrease(256)
+            self.de2 = ChDecrease(512)
+            self.de3 = ChDecrease(1024)
+            self.de4 = ChDecrease(2048)
+                
+        self.up1 = Up(768, 256)
+        self.up2 = Up(384, 128)
+        self.up3 = Up(192, 64)
+        self.up4 = Up(128, 64, last_cat=True)
+        self.outconv = nn.Conv2d(64, num_classes, 1)
+
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        x0, x1, x2, x3, x4 = self.down(x)
+        rate = self.fore_pred()
+        # print(x0.shape, x1.shape, x2.shape, x3.shape, x4.shape)
+        if not (BACKBONE == 'resnet18' or BACKBONE == 'resnet34'):
+            x1 = self.de1(self.x1)
+            x2 = self.de2(self.x2)
+            x3 = self.de3(self.x3)
+            x4 = self.de4(self.x4)
+
+        x = self.up1(self.x4, self.x3)
+        x = self.up2(x, self.x2)
+        x = self.up3(x, self.x1)
+        x = self.up4(x, self.x0)
+        output = self.outconv(x)
+
+        x = sigmoid(output)
+        fore_output = (x > rate).byte()
+        output = torch.cat(output, fore_output)
+
+        return fore_output, output

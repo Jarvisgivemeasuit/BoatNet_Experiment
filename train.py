@@ -116,9 +116,7 @@ class Trainer:
         if self.train_metric.pixacc.get() > self.best_pred and self.train_metric.miou.get() > self.best_miou:
             self.best_pred = self.train_metric.pixacc.get()
             self.best_miou = self.train_metric.miou.get()
-
-            if self.train_metric.pixacc.get() > 0.9 and self.train_metric.miou.get() > 0.9:
-                save_model(self.net, self.args.model_name, self.args.backbone, self.train_metric.pixacc.get(), self.train_metric.miou.get())
+            save_model(self.net, self.args.model_name, self.args.backbone)
 
 
     def validation(self, epoch):

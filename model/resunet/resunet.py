@@ -103,9 +103,9 @@ class ChDecrease(nn.Module):
         x = self.conv1x1(x)
         return x
 
-class unet(nn.Module):
+class UNet(nn.Module):
     def __init__(self, inplanes, num_classes, backbone):
-        super(unet, self).__init__()
+        super().__init__()
         self.down = ResDown(in_channels=inplanes, backbone=backbone)
         self.list = None
 
