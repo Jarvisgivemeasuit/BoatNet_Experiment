@@ -229,6 +229,7 @@ def transpose_test_img_to_numpy(data_path, save_path):
     bar.finish()
 
 
+# 将图片label转为前背景二分类
 def fore_back(path_dict):
     img_list = os.listdir(path_dict['data_path'])
     num_imgs = len(img_list)

@@ -116,9 +116,9 @@ class ChDecrease(nn.Module):
         x = self.conv1x1(x)
         return x
 
-class Boat_Unet_part1(nn.Module):
+class Boat_UNet_part1(nn.Module):
     def __init__(self, inplanes, num_classes, backbone):
-        super(unet, self).__init__()
+        super().__init__()
         self.down = ResDown(in_channels=inplanes, backbone=backbone)
         self.fore_pred = Pred_Fore_Rate(512, 2)
         self.list = None
@@ -151,18 +151,19 @@ class Boat_Unet_part1(nn.Module):
         x = self.up2(x, self.x2)
         x = self.up3(x, self.x1)
         x = self.up4(x, self.x0)
-        output = self.outconv(x)
+        
+        fore_output = self.outconv(x)
+        fore_output = sigmoid(fore_output)
+        fore_feature = (fore_output > (1 - rate)).byte()
+        pred_rate = fore_feature.sum() / fore_feature.size
+        output = torch.cat(x, fore_output)
 
-        x = sigmoid(output)
-        fore_output = (x > rate).byte()
-        output = torch.cat(output, fore_output)
-
-        return fore_output, output
+        return fore_output, pred_rate, output
     
     
-class Boat_Unet_part2(nn.Module):
+class Boat_UNet_part2(nn.Module):
     def __init__(self, inplanes, num_classes, backbone):
-        super(unet, self).__init__()
+        super().__init__()
         self.down = ResDown(in_channels=inplanes, backbone=backbone)
         self.fore_pred = Pred_Fore_Rate(512, 2)
         self.list = None
@@ -178,8 +179,6 @@ class Boat_Unet_part2(nn.Module):
         self.up3 = Up(192, 64)
         self.up4 = Up(128, 64, last_cat=True)
         self.outconv = nn.Conv2d(64, num_classes, 1)
-
-        self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
         x0, x1, x2, x3, x4 = self.down(x)
@@ -197,8 +196,17 @@ class Boat_Unet_part2(nn.Module):
         x = self.up4(x, self.x0)
         output = self.outconv(x)
 
-        x = sigmoid(output)
-        fore_output = (x > rate).byte()
-        output = torch.cat(output, fore_output)
+        return output
+    
 
-        return fore_output, output
+class Boat_UNet(nn.Module):
+    def __init__(self, inplanes, num_classes, backbone)
+    self.part1 = Boat_UNet_part1(inplanes, 1, backbone)
+    self.part2 = Boat_UNet_part2(65, num_classes, backbone)
+    
+    def forward(self, x):
+        fore_output, pred_rate, x1 = self.part1(x)
+        output = self.part2(x1)
+        
+        return fore_output, pred_rate, output
+        
