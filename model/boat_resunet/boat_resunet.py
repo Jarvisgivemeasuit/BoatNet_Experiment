@@ -6,6 +6,7 @@ import torch.nn.functional as F
 
 BACKBONE = 'resnet50'
 
+
 class ResDown(nn.Module):
     def __init__(self, backbone=BACKBONE, in_channels=3, pretrained=True,
                  zero_init_residual=False):
@@ -27,9 +28,6 @@ class ResDown(nn.Module):
         self.layer3 = model.layer3
         self.layer4 = model.layer4
 
-        # Zero-initialize the last BN in each residual branch,
-        # so that the residual branch starts with zeros, and each residual block behaves like an identity.
-        # This improves the model by 0.2~0.3% according to https://arxiv.org/abs/1706.02677
         if not pretrained:
             initialize_weights(self)
             for m in self.modules():
@@ -81,6 +79,7 @@ class Double_conv(nn.Module):
         x = self.conv(x)
         return x
 
+
 class Up(nn.Module):
     def __init__(self, inplanes, planes, bilinear=False, last_cat=False):
         super(Up, self).__init__()
@@ -91,11 +90,11 @@ class Up(nn.Module):
             # self.up = nn.ConvTranspose2d(512, 512, 2, stride=8)
         self.conv = Double_conv(inplanes, planes)
         self.last_cat = last_cat
-    
+
     def forward(self, x1, x2):
         if not self.last_cat:
             x1 = self.up(x1)
-        
+
         # input is CHW
         diffY = x2.size()[2] - x1.size()[2]
         diffX = x2.size()[3] - x1.size()[3]
@@ -107,6 +106,7 @@ class Up(nn.Module):
         x = self.conv(x)
         return x
 
+
 class ChDecrease(nn.Module):
     def __init__(self, inplanes):
         super().__init__()
@@ -115,6 +115,7 @@ class ChDecrease(nn.Module):
     def forward(self, x):
         x = self.conv1x1(x)
         return x
+
 
 class Boat_UNet_part1(nn.Module):
     def __init__(self, inplanes, num_classes, backbone):
@@ -128,7 +129,7 @@ class Boat_UNet_part1(nn.Module):
             self.de2 = ChDecrease(512)
             self.de3 = ChDecrease(1024)
             self.de4 = ChDecrease(2048)
-                
+
         self.up1 = Up(768, 256)
         self.up2 = Up(384, 128)
         self.up3 = Up(192, 64)
@@ -151,7 +152,7 @@ class Boat_UNet_part1(nn.Module):
         x = self.up2(x, self.x2)
         x = self.up3(x, self.x1)
         x = self.up4(x, self.x0)
-        
+
         fore_output = self.outconv(x)
         fore_output = sigmoid(fore_output)
         fore_feature = (fore_output > (1 - rate)).byte()
@@ -159,8 +160,8 @@ class Boat_UNet_part1(nn.Module):
         output = torch.cat(x, fore_output)
 
         return fore_output, pred_rate, output
-    
-    
+
+
 class Boat_UNet_part2(nn.Module):
     def __init__(self, inplanes, num_classes, backbone):
         super().__init__()
@@ -173,7 +174,7 @@ class Boat_UNet_part2(nn.Module):
             self.de2 = ChDecrease(512)
             self.de3 = ChDecrease(1024)
             self.de4 = ChDecrease(2048)
-                
+
         self.up1 = Up(768, 256)
         self.up2 = Up(384, 128)
         self.up3 = Up(192, 64)
@@ -197,16 +198,15 @@ class Boat_UNet_part2(nn.Module):
         output = self.outconv(x)
 
         return output
-    
+
 
 class Boat_UNet(nn.Module):
     def __init__(self, inplanes, num_classes, backbone)
     self.part1 = Boat_UNet_part1(inplanes, 1, backbone)
     self.part2 = Boat_UNet_part2(65, num_classes, backbone)
-    
+
     def forward(self, x):
         fore_output, pred_rate, x1 = self.part1(x)
         output = self.part2(x1)
-        
+
         return fore_output, pred_rate, output
-        

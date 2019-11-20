@@ -1,19 +1,18 @@
 import os
 import time
-import sys
 
 from collections import namedtuple
 from progress.bar import Bar
 from apex import amp
 from PIL import Image
 
-sys.path.append("/home/arron/Documents/grey/paper/experiment")
+# sys.path.append("/home/arron/Documents/grey/paper/experiment")
 
-import utils.metrics as metrics
-from utils.args import Args
-from utils.utils import *
-from model import get_model, save_model
-from dataset.rssrai import Rssrai
+import experiment.utils.metrics as metrics
+from experiment.utils.args import Args
+from experiment.utils.utils import *
+from experiment.model import get_model, save_model
+from experiment.dataset.rssrai import Rssrai
 
 import torch
 from torch import nn

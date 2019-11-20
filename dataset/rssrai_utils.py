@@ -160,7 +160,7 @@ class ImageSpliter:
 
     def get_data_list(self):
         return self.data_list
-        
+
     def split_image(self):
         img_list = os.listdir(self.data_path)
         num_imgs = len(img_list)
@@ -197,12 +197,12 @@ class ImageSpliter:
                 np.save(os.path.join(self.save_path, split_image_name), split_image)
                 if y == width:
                     break
-                
+
                 y = min(width, y + len_y // 2)
                 col_count += 1
                 bar.suffix = f'{row_count * (height // len_y + 1) * 2 + col_count}/{num_imgs}'
                 bar.next()
-        
+
             if x == height:
                 break
             x = min(height, x + len_x // 2)
@@ -236,19 +236,21 @@ def fore_back(path_dict):
     bar = Bar('Saving binary file:', max=num_imgs)
     for i, img_file in enumerate(img_list):
         img_np = np.load(os.path.join(path_dict['data_path'], img_file))
-        
+
         back = (img_np['label'] == 15).sum()
         rate = (img_np['label'].size - back) / img_np['label'].size
-        
+
         mask = np.ones(img_np['label'].shape)
         mask[np.where(img_np['label'] == 15)] = 0
-        
+
         save_name = '_'.join([img_file.replace('.npz', ''),'{:.4f}'.format(rate)])
-        
+
         np.savez(os.path.join(path_dict['save_path'], save_name),{'image':img_np['image'], 'label':mask})
         bar.suffix = f'{i + 1} / {num_imgs}'
         bar.next()
     bar.finish()
+
+
 
 
 if __name__ == '__main__':
@@ -257,8 +259,8 @@ if __name__ == '__main__':
     # path_dict['save_path'] = '/home/arron/dataset/rssrai2019/test/test_split'
     # spliter = ImageSpliter(path_dict, (900, 850))
     # spliter.split_image()
-    
-    
-    path_dict['data_path'] = '/home/arron/dataset/rssrai2019/train_numpy_256'
-    path_dict['save_path'] = '/home/arron/Documents/grey/paper/binary_label'
+
+
+    path_dict['data_path'] = '/home/arron/dataset/rssrai2019/val_numpy_256'
+    path_dict['save_path'] = '/home/arron/Documents/grey/paper/valid_binary_label'
     fore_back(path_dict)
