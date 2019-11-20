@@ -1,5 +1,8 @@
 import os
+import random
+import shutil
 import numpy as np
+
 from libtiff import TIFF
 from progress.bar import Bar
 
@@ -60,7 +63,7 @@ class ImageSpliter:
             
             img_obj = TIFF.open(os.path.join(self.data_path, 'img', img_file))
             label_obj = TIFF.open(os.path.join(self.data_path, 'label', label_file))
-            img, label = img_obj.read_image(), label_obj.read_image()
+            img, label = img_obj.read_image().transpose((2, 0, 1)), label_obj.read_image().transpose((2, 0, 1))
             
             self._img_crop(img, img_name, i, 'image')
             self._img_crop(label, label_name, i, 'label')
@@ -80,26 +83,29 @@ class ImageSpliter:
             y = 0
             col_count = 0
             while y < width:
-                if y >= width - len_y and x >= height - len_x:
+                if y > width - len_y and x > height - len_x:
                     split_image = img[:, height - len_x:, width - len_y:]
-                elif y >= width - len_y:
+                elif y > width - len_y:
                     split_image = img[:, x:x + len_x, width - len_y:]
-                elif x >= height - len_x:
+                elif x > height - len_x:
                     split_image = img[:, height - len_x:, y:y + len_y]
                 else:
                     split_image = img[:, x:x + len_x, y:y + len_y]
 
-                split_image_name = '_'.join([img_name, str(row_count), str(col_count)])
                 if tp == 'image':
+                    split_image_name = '_'.join([img_name, str(row_count), str(col_count)])
                     np.save(os.path.join(self.save_path, 'img', split_image_name), split_image)
                 else:
+                    split_image_name = '_'.join([img_name.replace('_label', ''), str(row_count), str(col_count)])
                     np.save(os.path.join(self.save_path, 'label', split_image_name), split_image)
+                # print(" ", height, width, row_count, col_count)
                 if y == width:
                     break
-
+                
                 y = min(width, y + len_y)
                 col_count += 1
-                bar.suffix = f'{row_count * (height // len_x + 1) + col_count}/{num_imgs}'
+                
+                bar.suffix = f'{row_count * (width // len_y + 1) + col_count}/{num_imgs}'
                 bar.next()
 
             if x == height:
@@ -115,34 +121,32 @@ def make_sure_path_exists(path):
         
         
 # 切分训练集和验证集
-def train_valid(paths_dict, source_path, tr_save_path, vd_save_path):
-    _data_list = os.listdir(os.path.join(source_path, 'img'))
-    num_names = len(_data_list)
-    num_train = int(num_names * 0.9)
-    num_val = num_names - num_train
+def train_valid(paths_dict):
+    _data_list = os.listdir(os.path.join(paths_dict['source_path'], 'img'))
+    num_files = len(_data_list)
+    num_train = int(num_files * 0.9)
+    num_val = num_files - num_train
 
-    bar = Bar('Dividing:', max=num_names)
+    bar = Bar('Dividing trainset and validset:', max=num_files)
     
-    for i in range(num_names):
+    for i in range(num_files):
         file = random.choice(_data_list)
         name = file.split(".")[0]
         _data_list.remove(file)
-        img_file = ''.join([name, paths_dict['image_format']])
-        label_file = ''.join([name, paths_dict['label_format']])
 
-        img_source = os.path.join(source_path, 'img', img_file)
-        label_source = os.path.join(source_path, 'label', label_file)
+        img_source = os.path.join(paths_dict['source_path'], 'img', file)
+        label_source = os.path.join(paths_dict['source_path'], 'label', file)
 
         if i < num_train:
-            img_target = os.path.join(tr_save_path, 'img')
-            label_target = os.path.join(tr_save_path, 'label')
+            img_target = os.path.join(paths_dict['tr_save_path'], 'img')
+            label_target = os.path.join(paths_dict['tr_save_path'], 'label')
         else:
-            img_target = os.path.join(vd_save_path, 'img')
-            label_target = os.path.join(vd_save_path, 'label')
+            img_target = os.path.join(paths_dict['vd_save_path'], 'img')
+            label_target = os.path.join(paths_dict['vd_save_path'], 'label')
             
         shutil.copy(img_source, img_target)
         shutil.copy(label_source, label_target)
-        bar.suffix = f'{i + 1}/{num_names}'
+        bar.suffix = f'{i + 1}/{num_files}'
         bar.next()
     bar.finish()
 
@@ -163,10 +167,17 @@ if __name__ == '__main__':
     paths_obj = ProcessingPath()
     paths_dict = paths_obj.get_paths_dict(mode='all')
 
-    spliter_paths = {}
-    spliter_paths['data_path'] = paths_dict['ori_path']
-    spliter_paths['save_path'] = paths_dict['data_split_256']
-    spliter_paths['img_format'] = '.tif'
+    # spliter_paths = {}
+    # spliter_paths['data_path'] = paths_dict['ori_path']
+    # spliter_paths['save_path'] = paths_dict['data_split_256']
+    # spliter_paths['img_format'] = '.tif'
     
-    spliter = ImageSpliter(spliter_paths)
-    spliter.split_image()
+    # spliter = ImageSpliter(spliter_paths)
+    # spliter.split_image()
+    
+    division_path = {}
+    division_path['source_path'] = paths_dict['data_split_256']
+    division_path['tr_save_path'] = paths_dict['train_split_256']
+    division_path['vd_save_path'] = paths_dict['val_split_256']
+    
+    train_valid(division_path)
