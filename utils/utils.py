@@ -7,6 +7,7 @@ from dataset import rssrai
 from tensorboardX import SummaryWriter
 from PIL import Image
 
+import torch
 
 def get_labels(label_number):
     """
@@ -255,6 +256,34 @@ class SuperMerger:
         split_tmp = img_file.split('_')[-2:]
         y, x = split_tmp[0], split_tmp[1].replace('.tif', '')
         return img_file.replace("_".join(split_tmp), ''), x, y
+    
+    
+class SoftmaxCrossEntropyLoss(nn.Module):
+    def __init__(self, ignore_index=-1):
+        super().__init__()
+        self.ignore_index = ignore_index
+        
+    def forward(self, pred, target):
+        pred = F.log_softmax(pred, dim=1)
+        mask = torch.zeros(target.shape)
+        mask = torch.where(target!=ignore_index, target, mask)
+        
+        loss = -(pred * (mask != 0).byte()).sum(1)
+        return loss / pred.Shape[0]
+    
+    
+class BoatLoss(nn.Module):
+    def __init__(self, ignore_index=-1):
+        super().__init__()
+        self.loss1 = torch.nn.MSELoss()
+        self.loss2 = SoftmaxCrossEntropyLoss(ignore_index)
+    
+    def forward(self, output_mask, target, output_bmask, bmask, output_rate, rate):
+        rate_loss = self.loss1(output_rate, rate)
+        binary_loss = self.loss2(output_bmask, bmask)
+        output_loss = self.loss2(output_mask, target)
+        
+        return rate_loss + binary_loss + output_loss
 
 
 if __name__ == '__main__':

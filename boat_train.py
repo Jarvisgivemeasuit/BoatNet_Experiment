@@ -45,7 +45,7 @@ class Trainer:
             self.net, self.optimizer = amp.initialize(self.net, self.optimizer, opt_level='O1')
         self.net = nn.DataParallel(self.net, self.args.gpu_ids)
 
-        self.criterion = torch.nn.CrossEntropyLoss(ignore_index=255).cuda()
+        self.criterion = BoatLoss(ignore_index=16).cuda()
         self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, [40, 60], 0.3)
         self.Metric = namedtuple('Metric', 'pixacc miou kappa')
 
@@ -73,12 +73,12 @@ class Trainer:
         self.net.train()
 
         for idx, sample in enumerate(self.train_loader):
-            img, tar = sample['image'], sample['label']
+            img, tar, bmask, rate = sample['image'], sample['label'], sample['binary_mask'], sample['rate']
             if self.args.cuda:
-                img, tar = img.cuda(), tar.cuda()
+                img, tar, bmask, rate = img.cuda(), tar.cuda(), bmask.cuda(), rate.cuda()
 
             self.optimizer.zero_grad()
-            output = self.net(img)
+            output_mask, output_rate, output_bmask = self.net(img)
             loss = self.criterion(output, tar)
             losses.update(loss.item())
 

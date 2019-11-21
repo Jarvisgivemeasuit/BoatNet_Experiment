@@ -9,7 +9,7 @@ class Args:
         self.inplanes = 4
 
         self.model_name = 'boat_resunet'
-        self.backbone = 'resnet50'
+        self.backbone = ['resnet50', 'resnet18']
         self.epochs = 80
         self.lr = 0.1
         self.no_val = False

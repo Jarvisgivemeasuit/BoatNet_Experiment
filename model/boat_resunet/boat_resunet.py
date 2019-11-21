@@ -160,13 +160,13 @@ class Boat_UNet_Part1(nn.Module):
         x = self.up4(x, x0)
 
         fore_output = self.outconv(x)
-        fore_output = self.sigmoid(fore_output)
-        fore_feature = (fore_output > (1 - rate)).byte()
+        fore_output_ = self.sigmoid(fore_output)
+        fore_feature = (fore_output_ > (1 - rate)).byte()
 
         fore_size = fore_feature[0].size()[0] * fore_feature[0].size()[1] * fore_feature[0].size()[2]
         pred_rate = fore_feature.sum(dim=(1, 2, 3)) / fore_size
         
-        output = torch.cat([x, fore_output], dim=1)
+        output = torch.cat([x, fore_feature], dim=1)
 
         return fore_output, pred_rate, output
 
