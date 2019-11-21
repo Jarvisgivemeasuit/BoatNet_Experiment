@@ -1,7 +1,10 @@
 import torch.nn as nn
 import torch
-from . import torchvision_resnet
-from .resunet_utils import initialize_weights
+import torchvision_resnet
+import numpy as np
+from torchsummary import summary
+
+from boat_resunet_utils import initialize_weights
 import torch.nn.functional as F
 
 BACKBONE = 'resnet50'
@@ -117,18 +120,19 @@ class ChDecrease(nn.Module):
         return x
 
 
-class Boat_UNet_part1(nn.Module):
+class Boat_UNet_Part1(nn.Module):
     def __init__(self, inplanes, num_classes, backbone):
         super().__init__()
         self.down = ResDown(in_channels=inplanes, backbone=backbone)
-        self.fore_pred = Pred_Fore_Rate(512, 2)
-        self.list = None
+        self.backbone = backbone
 
-        if not (BACKBONE == 'resnet18' or BACKBONE == 'resnet34'):
+        if self.backbone not in ['resnet18', 'resnet34']:
             self.de1 = ChDecrease(256)
             self.de2 = ChDecrease(512)
             self.de3 = ChDecrease(1024)
             self.de4 = ChDecrease(2048)
+
+        self.fore_pred = Pred_Fore_Rate(512, 1)
 
         self.up1 = Up(768, 256)
         self.up2 = Up(384, 128)
@@ -140,36 +144,40 @@ class Boat_UNet_part1(nn.Module):
 
     def forward(self, x):
         x0, x1, x2, x3, x4 = self.down(x)
-        rate = self.fore_pred()
-        # print(x0.shape, x1.shape, x2.shape, x3.shape, x4.shape)
-        if not (BACKBONE == 'resnet18' or BACKBONE == 'resnet34'):
-            x1 = self.de1(self.x1)
-            x2 = self.de2(self.x2)
-            x3 = self.de3(self.x3)
-            x4 = self.de4(self.x4)
 
-        x = self.up1(self.x4, self.x3)
-        x = self.up2(x, self.x2)
-        x = self.up3(x, self.x1)
-        x = self.up4(x, self.x0)
+        # print(x0.shape, x1.shape, x2.shape, x3.shape, x4.shape)
+        if self.backbone not in ['resnet18', 'resnet34']:
+            x1 = self.de1(x1)
+            x2 = self.de2(x2)
+            x3 = self.de3(x3)
+            x4 = self.de4(x4)
+
+        rate = self.fore_pred(x4)
+
+        x = self.up1(x4, x3)
+        x = self.up2(x, x2)
+        x = self.up3(x, x1)
+        x = self.up4(x, x0)
 
         fore_output = self.outconv(x)
-        fore_output = sigmoid(fore_output)
+        fore_output = self.sigmoid(fore_output)
         fore_feature = (fore_output > (1 - rate)).byte()
-        pred_rate = fore_feature.sum() / fore_feature.size
-        output = torch.cat(x, fore_output)
+
+        fore_size = fore_feature[0].size()[0] * fore_feature[0].size()[1] * fore_feature[0].size()[2]
+        pred_rate = fore_feature.sum(dim=(1, 2, 3)) / fore_size
+        
+        output = torch.cat([x, fore_output], dim=1)
 
         return fore_output, pred_rate, output
 
 
-class Boat_UNet_part2(nn.Module):
+class Boat_UNet_Part2(nn.Module):
     def __init__(self, inplanes, num_classes, backbone):
         super().__init__()
         self.down = ResDown(in_channels=inplanes, backbone=backbone)
-        self.fore_pred = Pred_Fore_Rate(512, 2)
-        self.list = None
+        self.backbone = backbone
 
-        if not (BACKBONE == 'resnet18' or BACKBONE == 'resnet34'):
+        if self.backbone not in ['resnet18', 'resnet34']:
             self.de1 = ChDecrease(256)
             self.de2 = ChDecrease(512)
             self.de3 = ChDecrease(1024)
@@ -183,30 +191,38 @@ class Boat_UNet_part2(nn.Module):
 
     def forward(self, x):
         x0, x1, x2, x3, x4 = self.down(x)
-        rate = self.fore_pred()
         # print(x0.shape, x1.shape, x2.shape, x3.shape, x4.shape)
-        if not (BACKBONE == 'resnet18' or BACKBONE == 'resnet34'):
-            x1 = self.de1(self.x1)
-            x2 = self.de2(self.x2)
-            x3 = self.de3(self.x3)
-            x4 = self.de4(self.x4)
+        if self.backbone not in ['resnet18', 'resnet34']:
 
-        x = self.up1(self.x4, self.x3)
-        x = self.up2(x, self.x2)
-        x = self.up3(x, self.x1)
-        x = self.up4(x, self.x0)
+            x1 = self.de1(x1)
+            x2 = self.de2(x2)
+            x3 = self.de3(x3)
+            x4 = self.de4(x4)
+
+        x = self.up1(x4, x3)
+        x = self.up2(x, x2)
+        x = self.up3(x, x1)
+        x = self.up4(x, x0)
         output = self.outconv(x)
 
         return output
 
 
 class Boat_UNet(nn.Module):
-    def __init__(self, inplanes, num_classes, backbone)
-    self.part1 = Boat_UNet_part1(inplanes, 1, backbone)
-    self.part2 = Boat_UNet_part2(65, num_classes, backbone)
+    def __init__(self, inplanes, num_classes, backbone1, backbone2):
+        super().__init__()
+        self.part1 = Boat_UNet_Part1(inplanes, 1, backbone1)
+        self.part2 = Boat_UNet_Part2(65, num_classes, backbone2)
 
     def forward(self, x):
-        fore_output, pred_rate, x1 = self.part1(x)
-        output = self.part2(x1)
+        fore_output, pred_rate, x = self.part1(x)
+        output = self.part2(x)
 
         return fore_output, pred_rate, output
+
+
+# net = Boat_UNet_Part1(4, 1, 'resnet50')
+# summary(net.cuda(), (4, 256, 256))
+
+# net = Boat_UNet_Part2(65, 16, 'resnet18')
+# summary(net.cuda(), (65, 256, 256))

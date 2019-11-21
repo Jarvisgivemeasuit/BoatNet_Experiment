@@ -8,8 +8,8 @@ class Args:
         self.num_workers = 8
         self.inplanes = 4
 
-        self.model_name = 'resunet'
-        self.backbone = 'resnet101'
+        self.model_name = 'boat_resunet'
+        self.backbone = 'resnet50'
         self.epochs = 80
         self.lr = 0.1
         self.no_val = False

@@ -67,8 +67,8 @@ class Rssrai(Dataset):
         
         sample = {'image': image, 'label': label}
         sample = _train_enhance(sample)
-        sample = {'image': sample['image'], 'label': sample['label'], 'binary_mask':binary_mask, 'rate':rate}
-        
+        sample['binary_mask'] = binary_mask
+        sample['rate'] = rate
         return sample
 
     def load_img(self, idx):

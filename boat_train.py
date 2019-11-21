@@ -19,7 +19,7 @@ from torch import nn
 import torch.utils.data
 from torch.utils.data import DataLoader
 import torch.optim
-import numpy as np 
+import numpy as np
 
 
 class Trainer:
