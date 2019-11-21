@@ -226,7 +226,7 @@ def transpose_test_img_to_numpy(data_path, save_path):
         np.save(os.path.join(save_path, img_file.split('.')[0]), img)
         bar.suffix = f'{i + 1}/{len(img_list)}'
         bar.next()
-    bar.finish()
+    bar.finish() 
 
 
 # 将图片label转为前背景二分类

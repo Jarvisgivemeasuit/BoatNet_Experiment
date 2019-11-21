@@ -12,7 +12,7 @@ import experiment.utils.metrics as metrics
 from experiment.utils.args import Args
 from experiment.utils.utils import *
 from experiment.model import get_model, save_model
-from experiment.dataset.rssrai import Rssrai
+from experiment.dataset.rssrai2 import Rssrai
 
 import torch
 from torch import nn

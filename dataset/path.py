@@ -17,6 +17,8 @@ class Path:
             return '/home/arron/Documents/arron/dataSet/coco'
         elif dataset_name == 'rssrai':
             return '/home/arron/dataset/rssrai2019'
+        elif dataset_name == 'rssrai_grey':
+            return '/home/arron/dataset/rssrai_grey/'
         else:
             print('Dataset {} not available.'.format(dataset_name))
             raise NotImplementedError
