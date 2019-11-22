@@ -7,7 +7,7 @@ from progress.bar import Bar
 from apex import amp
 from PIL import Image
 
-# sys.path.append("/home/arron/Documents/grey/paper/experiment")
+sys.path.append("/home/arron/Documents/grey/paper/")
 
 import experiment.utils.metrics as metrics
 from experiment.utils.args import Args

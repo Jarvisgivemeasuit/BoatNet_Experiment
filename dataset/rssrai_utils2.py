@@ -268,6 +268,45 @@ def fore_back(path_dict):
     bar.finish()
 
 
+#  计算所有图片像素的均值并调用std
+def mean_std(path):
+    img_list = os.listdir(path)
+    pixels_num = 0
+    value_sum = 0
+    files_num = len(img_list)
+    bar = Bar('Calculating mean:', max=files_num)
+
+    i = 0
+    for img_file in img_list:
+        img = cv2.imread(os.path.join(path, img_file), cv2.IMREAD_GRAYSCALE)
+        pixels_num += img.size
+        value_sum +=img.sum()
+        i += 1
+        bar.suffix = f'{i}/{files_num}'
+        bar.next()
+    bar.finish()
+
+    value_mean = value_sum / pixels_num
+    value_std = _std(path, img_list, value_mean, pixels_num)
+    return value_mean, value_std
+
+
+# 计算所有图片的标准差
+def _std(path, img_list, mean, pixels_num):
+    files_num = len(img_list)
+    bar = Bar('Calculating std:', max=files_num)
+    value_std = 0
+    i = 0
+    for img_file in img_list:
+        img = cv2.imread(os.path.join(path, img_file), cv2.IMREAD_GRAYSCALE)
+        value_std += ((img - mean) ** 2).sum()
+        i += 1
+        bar.suffix = f'{i}/{files_num}'
+        bar.next()
+    bar.finish()
+    return math.sqrt(value_std / pixels_num)
+
+
 if __name__ == '__main__':
     paths_obj = ProcessingPath()
     paths_dict = paths_obj.get_paths_dict(mode='all')

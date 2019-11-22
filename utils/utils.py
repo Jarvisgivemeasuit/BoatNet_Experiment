@@ -1,15 +1,15 @@
-import numpy as np 
-import os
-import matplotlib.pyplot as plt
 import sys
+import os
+import numpy as np 
+import matplotlib.pyplot as plt
+from PIL import Image
 sys.path.append('../')
 
 from dataset import rssrai2
-from tensorboardX import SummaryWriter
-from PIL import Image
 
 import torch
 from torch import nn
+import torch.nn.functional as F
 
 
 def get_labels(label_number):
@@ -267,12 +267,14 @@ class SoftmaxCrossEntropyLoss(nn.Module):
         self.ignore_index = ignore_index
         
     def forward(self, pred, target):
+        target = target.reshape(target.shape[0], 1, target.shape[1], target.shape[2]).double()
         pred = F.log_softmax(pred, dim=1)
-        mask = torch.zeros(target.shape)
-        mask = torch.where(target!=ignore_index, target, mask)
+        mask = torch.zeros(target.shape).double().cuda()
+        mask = torch.where(target!=self.ignore_index, target, mask)
+        # mask = mask.reshape(mask.shape[0], 1, mask.shape[1], mask.shape[2])
         
-        loss = -(pred * (mask != 0).byte()).sum(1)
-        return loss / pred.Shape[0]
+        loss = -(pred * (mask != 0).float()).sum(1)
+        return loss / pred.shape[0]
     
     
 class BoatLoss(nn.Module):

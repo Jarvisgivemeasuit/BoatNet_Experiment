@@ -98,4 +98,5 @@ class Rssrai(Dataset):
             A.Cutout(p=1),
             A.Normalize(mean=self.mean, std=self.std, p=1),
         ], additional_targets={'image': 'image', 'label': 'mask'})
+        print(sample['image'].shape)
         return compose(**sample) 

@@ -40,7 +40,9 @@ class Trainer:
         self.val_loader = DataLoader(val_set, batch_size=self.args.vd_batch_size,
                                      shuffle=False, num_workers=self.args.num_workers)
 
-        self.net = get_model(self.args.model_name, self.args.backbone, self.args.inplanes, self.num_classes).cuda()
+        self.net_st = get_model(self.args.model_name, self.args.backbone, self.args.inplanes, self.num_classes).cuda()
+        self.net_nd = get_model(self.args.model_name, self.args.backbone, self.args.inplanes, self.num_classes).cuda()
+        
         self.optimizer = torch.optim.SGD(self.net.parameters(), lr=self.args.lr, momentum=0.9)
         if self.args.apex:
             self.net, self.optimizer = amp.initialize(self.net, self.optimizer, opt_level='O1')
@@ -74,7 +76,6 @@ class Trainer:
         self.net.train()
 
         for idx, sample in enumerate(self.train_loader):
-            print('sample length -------------', len(sample))
             img, tar, bmask, rate = sample['image'], sample['label'], sample['binary_mask'], sample['rate']
             if self.args.cuda:
                 img, tar, bmask, rate = img.cuda(), tar.cuda(), bmask.cuda(), rate.cuda()
@@ -82,11 +83,11 @@ class Trainer:
             self.optimizer.zero_grad()
             output_mask, output_rate, output_bmask = self.net(img)
             loss = self.criterion(output_mask, tar, output_bmask, bmask, output_rate, rate)
-            losses.update(loss.item())
+            losses.update(loss)
 
-            self.train_metric.pixacc.update(output, tar)
-            self.train_metric.miou.update(output, tar)
-            self.train_metric.kappa.update(output, tar)
+            self.train_metric.pixacc.update(output_mask, tar)
+            self.train_metric.miou.update(output_mask, tar)
+            self.train_metric.kappa.update(output_mask, tar)
 
             if self.args.apex:
                 with amp.scale_loss(loss, self.optimizer) as scale_loss:

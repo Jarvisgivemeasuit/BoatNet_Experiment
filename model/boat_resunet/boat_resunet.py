@@ -166,9 +166,9 @@ class Boat_UNet_Part1(nn.Module):
         fore_size = fore_feature[0].size()[0] * fore_feature[0].size()[1] * fore_feature[0].size()[2]
         pred_rate = fore_feature.sum(dim=(1, 2, 3)) / fore_size
         
-        output = torch.cat([x, fore_feature], dim=1)
+        output = torch.cat([x, fore_output], dim=1)
 
-        return fore_output, pred_rate, output
+        return fore_output, pred_rate.float(), output
 
 
 class Boat_UNet_Part2(nn.Module):

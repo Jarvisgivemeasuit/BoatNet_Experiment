@@ -2,6 +2,8 @@ import os
 from glob import glob
 import torch
 from torch.utils.data import Dataset
+from torchvision import transforms
+
 import numpy as np
 import random
 
@@ -62,11 +64,12 @@ class Rssrai(Dataset):
     def load_numpy(self, idx):
         image = np.load(os.path.join(self._image_dir, self._data_list[idx]))
         mask = np.load(os.path.join(self._label_dir, self._data_list[idx]))
-        binary_dict = np.load(os.path.join(self._rate_dir, self._data_list[idx]))
+        binary_dict = np.load(os.path.join(self._rate_dir, self._data_list[idx]), allow_pickle=True).item()
         binary_mask, rate = binary_dict['binary_mask'], binary_dict['rate']
         
-        sample = {'image': image, 'label': label}
-        sample = _train_enhance(sample)
+        sample = {'image': image, 'label': mask}
+        sample = self._train_enhance(sample)
+        sample['image'] = sample['image'].transpose((2, 0, 1))
         sample['binary_mask'] = binary_mask
         sample['rate'] = rate
         return sample
@@ -105,4 +108,6 @@ class Rssrai(Dataset):
             A.Cutout(p=1),
             A.Normalize(mean=self.mean, std=self.std, p=1),
         ], additional_targets={'image': 'image', 'label': 'mask'})
-        return compose(**sample) 
+        sample['image'] = sample['image'].transpose((1, 2, 0))
+
+        return compose(**sample)
