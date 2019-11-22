@@ -9,14 +9,14 @@ from libtiff import TIFF
 from PIL import Image
 import albumentations as A
 
-from .path import Path
+# from .path import Path
 from .rssrai_utils2 import *
 
 
 class Rssrai(Dataset):
     NUM_CLASSES = 16
     
-    def __init__(self, mode='train', batch_size=256, base_dir=Path.db_root_dir('rssrai_grey')):
+    def __init__(self, mode='train', batch_size=256, base_dir=Path.get_root_path('rssrai_grey')):
         assert mode in ['train', 'val', 'test']
         super().__init__()
 

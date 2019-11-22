@@ -1,10 +1,10 @@
-import torch.nn as nn
 import torch
-import torchvision_resnet
+import torch.nn as nn
 import numpy as np
 from torchsummary import summary
 
-from boat_resunet_utils import initialize_weights
+from . import torchvision_resnet
+from .boat_resunet_utils import initialize_weights
 import torch.nn.functional as F
 
 BACKBONE = 'resnet50'

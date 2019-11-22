@@ -226,7 +226,7 @@ def label_indices(mask):
 
     # colormap2mask
     mask = mask.astype('int32')
-    idx = (mask[:, :, 0] * 256 + mask[:, :, 1]) * 256 + mask[:, :, 2]
+    idx = (mask[0, :, :] * 256 + mask[1, :, :]) * 256 + mask[2, :, :]
     return colormap2label[idx].astype('int32')
 
 
@@ -238,7 +238,9 @@ def save_label_map(paths_dict):
     for i, label_file in enumerate(label_list):
         label = np.load(os.path.join(paths_dict['data_path'], label_file))
         mask = label_indices(label)
+
         np.save(os.path.join(paths_dict['save_path'], label_file), mask)
+        
         bar.suffix = f'{i + 1} / {num_labels}'
         bar.next()
     bar.finish()

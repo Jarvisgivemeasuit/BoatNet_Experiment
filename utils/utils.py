@@ -3,11 +3,14 @@ import os
 import matplotlib.pyplot as plt
 import sys
 sys.path.append('../')
-from dataset import rssrai
+
+from dataset import rssrai2
 from tensorboardX import SummaryWriter
 from PIL import Image
 
 import torch
+from torch import nn
+
 
 def get_labels(label_number):
     """
@@ -78,8 +81,8 @@ def get_labels(label_number):
     return label_colors[label_number]
 
 def make_dataset(tr_batch_size, vd_batch_size):
-    train_set = rssrai.Rssrai(mode='train', batch_size=tr_batch_size)
-    val_set = rssrai.Rssrai(mode='val', batch_size=vd_batch_size)
+    train_set = rssrai2.Rssrai(mode='train', batch_size=tr_batch_size)
+    val_set = rssrai2.Rssrai(mode='val', batch_size=vd_batch_size)
     return train_set, val_set, train_set.NUM_CLASSES
 
 def decode_segmap(label_mask, label_number):

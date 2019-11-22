@@ -1,14 +1,15 @@
 import os
 import time
+import sys
 
 from collections import namedtuple
 from progress.bar import Bar
 from apex import amp
 from PIL import Image
 
-# sys.path.append("/home/arron/Documents/grey/paper/experiment")
+sys.path.append("/home/arron/Documents/grey/paper/")
 
-import experiment.utils.metrics as metrics
+from experiment.utils import metrics
 from experiment.utils.args import Args
 from experiment.utils.utils import *
 from experiment.model import get_model, save_model
@@ -73,13 +74,14 @@ class Trainer:
         self.net.train()
 
         for idx, sample in enumerate(self.train_loader):
+            print('sample length -------------', len(sample))
             img, tar, bmask, rate = sample['image'], sample['label'], sample['binary_mask'], sample['rate']
             if self.args.cuda:
                 img, tar, bmask, rate = img.cuda(), tar.cuda(), bmask.cuda(), rate.cuda()
 
             self.optimizer.zero_grad()
             output_mask, output_rate, output_bmask = self.net(img)
-            loss = self.criterion(output, tar)
+            loss = self.criterion(output_mask, tar, output_bmask, bmask, output_rate, rate)
             losses.update(loss.item())
 
             self.train_metric.pixacc.update(output, tar)
