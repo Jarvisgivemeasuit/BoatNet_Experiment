@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+from torch.autograd import Variable
 import numpy as np
 from torchsummary import summary
 
@@ -57,7 +58,7 @@ class Pred_Fore_Rate(nn.Module):
     def __init__(self, inplanes, planes):
         super().__init__()
         self.conv1x1 = nn.Conv2d(inplanes, planes, 1)
-        self.pool = nn.AdaptiveAvgPool2d((1, 1))
+        self.pool = nn.AdaptiveAvgPool2d(1)
 
     def forward(self, x):
         x = self.conv1x1(x)
@@ -140,7 +141,7 @@ class Boat_UNet_Part1(nn.Module):
         self.up4 = Up(128, 64, last_cat=True)
         self.outconv = nn.Conv2d(64, num_classes, 1)
 
-        self.sigmoid = nn.Sigmoid()
+        self.softmax = nn.Softmax(dim=1)
 
     def forward(self, x):
         x0, x1, x2, x3, x4 = self.down(x)
@@ -160,15 +161,16 @@ class Boat_UNet_Part1(nn.Module):
         x = self.up4(x, x0)
 
         fore_output = self.outconv(x)
-        fore_output_ = self.sigmoid(fore_output)
-        fore_feature = (fore_output_ > (1 - rate)).byte()
-
-        fore_size = fore_feature[0].size()[0] * fore_feature[0].size()[1] * fore_feature[0].size()[2]
-        pred_rate = fore_feature.sum(dim=(1, 2, 3)) / fore_size
         
-        output = torch.cat([x, fore_output], dim=1)
+        fore_feature = self.softmax(fore_output)
+        fore_feature = (fore_feature > (1 - rate)).float()
+        fore_feature = fore_feature[:, -1, :, :]
+        fore_feature = fore_feature.reshape(fore_feature.shape[0], 1, fore_feature.shape[1], fore_feature.shape[2])
 
-        return fore_output, pred_rate.float(), output
+        output = torch.cat([x, fore_feature], dim=1)
+        rate = rate.reshape(rate.shape[0])
+
+        return fore_output, rate, output
 
 
 class Boat_UNet_Part2(nn.Module):

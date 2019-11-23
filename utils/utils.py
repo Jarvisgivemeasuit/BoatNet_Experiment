@@ -10,6 +10,7 @@ from dataset import rssrai2
 import torch
 from torch import nn
 import torch.nn.functional as F
+from torch.autograd import Variable
 
 
 def get_labels(label_number):
@@ -259,36 +260,47 @@ class SuperMerger:
         split_tmp = img_file.split('_')[-2:]
         y, x = split_tmp[0], split_tmp[1].replace('.tif', '')
         return img_file.replace("_".join(split_tmp), ''), x, y
-    
-    
-class SoftmaxCrossEntropyLoss(nn.Module):
-    def __init__(self, ignore_index=-1):
-        super().__init__()
-        self.ignore_index = ignore_index
+
+
+# class SoftmaxCrossEntropyLoss(nn.Module):
+#     def __init__(self, ignore_index=-1):
+#         super().__init__()
+#         self.ignore_index = ignore_index
         
-    def forward(self, pred, target):
-        target = target.reshape(target.shape[0], 1, target.shape[1], target.shape[2]).double()
-        pred = F.log_softmax(pred, dim=1)
-        mask = torch.zeros(target.shape).double().cuda()
-        mask = torch.where(target!=self.ignore_index, target, mask)
-        # mask = mask.reshape(mask.shape[0], 1, mask.shape[1], mask.shape[2])
+#     def forward(self, pred, target):
+#         target = target.reshape(target.shape[0], 1, target.shape[1], target.shape[2]).double()
+#         pred = F.log_softmax(pred, dim=1)
         
-        loss = -(pred * (mask != 0).float()).sum(1)
-        return loss / pred.shape[0]
-    
-    
-class BoatLoss(nn.Module):
-    def __init__(self, ignore_index=-1):
-        super().__init__()
-        self.loss1 = torch.nn.MSELoss()
-        self.loss2 = SoftmaxCrossEntropyLoss(ignore_index)
-    
-    def forward(self, output_mask, target, output_bmask, bmask, output_rate, rate):
-        rate_loss = self.loss1(output_rate, rate)
-        binary_loss = self.loss2(output_bmask, bmask)
-        output_loss = self.loss2(output_mask, target)
+#         mask0 = torch.zeros(target.shape).double().cuda()
+#         mask1 = torch.ones(target.shape).double().cuda()
         
-        return rate_loss + binary_loss + output_loss
+#         mask = torch.where(target!=self.ignore_index, mask1, mask0)
+#         mask = Variable(mask)
+#         # mask = mask.reshape(mask.shape[0], 1, mask.shape[1], mask.shape[2])
+        
+#         # loss = -(pred * (mask * target).float()).sum(1)
+#         loss = -pred.sum(1)
+        
+#         # return loss / pred.shape[0]
+#         return loss
+    
+    
+# class BoatLoss(nn.Module):
+#     def __init__(self, ignore_index=-1):
+#         super().__init__()
+#         self.loss1 = torch.nn.MSELoss()
+#         self.loss2 = torch.nn.CrossEntropyLoss()
+#         # self.loss3 = SoftmaxCrossEntropyLoss(ignore_index)
+    
+#     def forward(self, output_bmask, bmask, output_rate, rate):
+#         rate_loss = self.loss1(output_rate, rate)
+#         binary_loss = self.loss2(output_bmask, bmask)
+
+#         # binary_loss = self.loss3(output_bmask, bmask.long())
+#         # output_loss = self.loss2(output_mask, target)
+        
+#         return rate_loss + binary_loss
+
 
 
 if __name__ == '__main__':

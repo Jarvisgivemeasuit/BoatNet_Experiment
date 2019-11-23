@@ -12,11 +12,12 @@ sys.path.append("/home/arron/Documents/grey/paper/")
 from experiment.utils import metrics
 from experiment.utils.args import Args
 from experiment.utils.utils import *
-from experiment.model import get_model, save_model
+from experiment.model.boat_resunet.boat_resunet import *
 from experiment.dataset.rssrai2 import Rssrai
 
 import torch
 from torch import nn
+from torch.autograd import Variable
 import torch.utils.data
 from torch.utils.data import DataLoader
 import torch.optim
@@ -40,15 +41,16 @@ class Trainer:
         self.val_loader = DataLoader(val_set, batch_size=self.args.vd_batch_size,
                                      shuffle=False, num_workers=self.args.num_workers)
 
-        self.net_st = get_model(self.args.model_name, self.args.backbone, self.args.inplanes, self.num_classes).cuda()
-        self.net_nd = get_model(self.args.model_name, self.args.backbone, self.args.inplanes, self.num_classes).cuda()
+        self.net_st = Boat_UNet_Part1(self.args.inplanes, 2, self.args.backbone1).cuda()
+        self.net_nd = Boat_UNet_Part2(65, self.num_classes, self.args.backbone2).cuda()
         
-        self.optimizer = torch.optim.SGD(self.net.parameters(), lr=self.args.lr, momentum=0.9)
+        self.optimizer = torch.optim.SGD(self.net_st.parameters(), lr=self.args.lr, momentum=0.9)
         if self.args.apex:
-            self.net, self.optimizer = amp.initialize(self.net, self.optimizer, opt_level='O1')
-        self.net = nn.DataParallel(self.net, self.args.gpu_ids)
+            self.net, self.optimizer = amp.initialize(self.net_st, self.optimizer, opt_level='O1')
+        self.net_st = nn.DataParallel(self.net, self.args.gpu_ids)
 
-        self.criterion = BoatLoss(ignore_index=16).cuda()
+        self.criterion0 = nn.MSELoss()
+        self.criterion1 = nn.CrossEntropyLoss(ignore_index=16).cuda()
         self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, [40, 60], 0.3)
         self.Metric = namedtuple('Metric', 'pixacc miou kappa')
 
@@ -79,15 +81,23 @@ class Trainer:
             img, tar, bmask, rate = sample['image'], sample['label'], sample['binary_mask'], sample['rate']
             if self.args.cuda:
                 img, tar, bmask, rate = img.cuda(), tar.cuda(), bmask.cuda(), rate.cuda()
+                
 
             self.optimizer.zero_grad()
-            output_mask, output_rate, output_bmask = self.net(img)
-            loss = self.criterion(output_mask, tar, output_bmask, bmask, output_rate, rate)
+            output_bmask, output_rate, pred_st = self.net_st(img)
+            loss1 = self.criterion0(output_rate, rate)
+            loss2 = self.criterion1(output_bmask, bmask.long())
+            
+            pred_nd = self.net_nd(pred_st)
+            loss3 = self.criterion1(pred_nd, tar.long())
+            
+            loss = loss1 + loss2 + loss3
             losses.update(loss)
 
-            self.train_metric.pixacc.update(output_mask, tar)
-            self.train_metric.miou.update(output_mask, tar)
-            self.train_metric.kappa.update(output_mask, tar)
+
+            self.train_metric.pixacc.update(pred_nd, tar)
+            self.train_metric.miou.update(pred_nd, tar)
+            self.train_metric.kappa.update(pred_nd, tar)
 
             if self.args.apex:
                 with amp.scale_loss(loss, self.optimizer) as scale_loss:
@@ -135,19 +145,27 @@ class Trainer:
         self.net.eval()
 
         for idx, sample in enumerate(self.val_loader):
-            img, tar = sample['image'], sample['label']
+            img, tar, bmask, rate = sample['image'], sample['label'], sample['binary_mask'], sample['rate']
             if self.args.cuda:
-                img, tar = img.cuda(), tar.cuda()
-            with torch.no_grad():
-                output = self.net(img)
-            loss = self.criterion(output, tar)
+                img, tar, bmask, rate = img.cuda(), tar.cuda(), bmask.cuda(), rate.cuda()
+                
+
+            self.optimizer.zero_grad()
+            output_bmask, output_rate, pred_st = self.net_st(img)
+            loss1 = self.criterion0(output_rate, rate)
+            loss2 = self.criterion1(output_bmask, bmask.long())
+            
+            pred_nd = self.net_nd(pred_st)
+            loss3 = self.criterion1(pred_nd, tar.long())
+            
+            loss = loss1 + loss2 + loss3
             losses.update(loss.item())
 
-            self.val_metric.pixacc.update(output, tar)
-            self.val_metric.miou.update(output, tar)
-            self.val_metric.kappa.update(output, tar)
+            self.val_metric.pixacc.update(pred_nd, tar)
+            self.val_metric.miou.update(pred_nd, tar)
+            self.val_metric.kappa.update(pred_nd, tar)
 
-            self.visualize_batch_image(img, tar, output, epoch, idx)
+            self.visualize_batch_image(img, tar, pred_nd, epoch, idx)
 
             batch_time.update(time.time() - starttime)
             starttime = time.time()

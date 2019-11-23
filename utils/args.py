@@ -4,14 +4,16 @@ class Args:
 
     def __init__(self):
         self.tr_batch_size = 10
-        self.vd_batch_size = 32
+        self.vd_batch_size = 4
         self.num_workers = 8
         self.inplanes = 4
 
         self.model_name = 'boat_resunet'
-        self.backbone = ['resnet50', 'resnet18']
+        self.backbone = 'resnet50'
+        self.backbone1 = 'resnet50'
+        self.backbone2 = 'resnet18'
         self.epochs = 80
-        self.lr = 0.1
+        self.lr = 0.01
         self.no_val = False
 
         self.gpu_ids = [0, 1]
