@@ -13,6 +13,7 @@ from experiment.utils import metrics
 from experiment.utils.args import Args
 from experiment.utils.utils import *
 from experiment.model.boat_resunet.boat_resunet import *
+from experiment.model import get_model, save_model
 from experiment.dataset.rssrai2 import Rssrai
 
 import torch
@@ -84,11 +85,11 @@ class Trainer:
                 
 
             self.optimizer.zero_grad()
-            output_bmask, output_rate, pred_st = self.net_st(img)
+            output_bmask, output_rate, pred_st, down_list = self.net_st(img)
             loss1 = self.criterion0(output_rate, rate)
             loss2 = self.criterion1(output_bmask, bmask.long())
             
-            pred_nd = self.net_nd(pred_st)
+            pred_nd = self.net_nd(pred_st, down_list)
             loss3 = self.criterion1(pred_nd, tar.long())
             
             loss = loss1 + loss2 + loss3
@@ -127,7 +128,7 @@ class Trainer:
         if self.train_metric.pixacc.get() > self.best_pred and self.train_metric.miou.get() > self.best_miou:
             self.best_pred = self.train_metric.pixacc.get()
             self.best_miou = self.train_metric.miou.get()
-            save_model(self.net, self.args.model_name, self.args.backbone)
+            save_model(self.net, self.args.model_name, self.args.backbone1, self.args.backbone2)
 
     def validation(self, epoch):
 
@@ -148,14 +149,14 @@ class Trainer:
             img, tar, bmask, rate = sample['image'], sample['label'], sample['binary_mask'], sample['rate']
             if self.args.cuda:
                 img, tar, bmask, rate = img.cuda(), tar.cuda(), bmask.cuda(), rate.cuda()
-                
 
             self.optimizer.zero_grad()
-            output_bmask, output_rate, pred_st = self.net_st(img)
+            output_bmask, output_rate, pred_st, down_list = self.net_st(img)
+
             loss1 = self.criterion0(output_rate, rate)
             loss2 = self.criterion1(output_bmask, bmask.long())
             
-            pred_nd = self.net_nd(pred_st)
+            pred_nd = self.net_nd(pred_st, down_list)
             loss3 = self.criterion1(pred_nd, tar.long())
             
             loss = loss1 + loss2 + loss3
@@ -165,7 +166,8 @@ class Trainer:
             self.val_metric.miou.update(pred_nd, tar)
             self.val_metric.kappa.update(pred_nd, tar)
 
-            self.visualize_batch_image(img, tar, pred_nd, epoch, idx)
+            # self.visualize_batch_image(img, bmask, output_bmask, epoch, idx, 2)
+            self.visualize_batch_image(img, tar, pred_nd, epoch, idx, 2)
 
             batch_time.update(time.time() - starttime)
             starttime = time.time()
@@ -197,7 +199,7 @@ class Trainer:
     def get_lr(self):
         return self.optimizer.param_groups[0]['lr']
 
-    def visualize_batch_image(self, image, target, output, epoch, batch_index):
+    def visualize_batch_image(self, image, target, output, epoch, batch_index, stage):
         # image (B,C,H,W) To (B,H,W,C)
         image_np = image.cpu().numpy()
         image_np = np.transpose(image_np, axes=[0, 2, 3, 1])
@@ -228,7 +230,7 @@ class Trainer:
             plt.imshow(output_rgb_tmp, vmin=0, vmax=255)
             save_path = os.path.join(self.args.vis_image_dir, f'epoch_{epoch}')
             make_sure_path_exists(save_path)
-            plt.savefig(f"{save_path}/{batch_index}-{i}.jpg")
+            plt.savefig(f"{save_path}/{batch_index}-{i}-stage{stage}.jpg")
             plt.close('all')
 
 

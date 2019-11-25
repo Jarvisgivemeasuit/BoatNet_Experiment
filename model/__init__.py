@@ -12,7 +12,11 @@ def get_model(model_name, backbone, inplanes, num_classes):
         return Boat_UNet(inplanes, num_classes, backbone[0], backbone[1])
 
 
-def save_model(model, model_name, backbone):
+def save_model(model, model_name, backbone1, backbone2=None):
     save_path = '/home/arron/Documents/grey/paper/model_saving/'
-    torch.save(model, os.path.join(save_path, "{}-{}-bast_pred.pth".format(backbone, model_name)))
+    if backbone2 is None:
+        torch.save(model, os.path.join(save_path, "{}-{}-bast_pred.pth".format(backbone, model_name)))
+    else:
+        torch.save(model, os.path.join(save_path, "{}-{}-{}-bast_pred.pth".format(backbone1, backbone2, model_name)))
+        
     print('saved model successful.')

@@ -112,9 +112,9 @@ class Up(nn.Module):
 
 
 class ChDecrease(nn.Module):
-    def __init__(self, inplanes):
+    def __init__(self, inplanes, times):
         super().__init__()
-        self.conv1x1 = nn.Conv2d(inplanes, inplanes // 4, kernel_size=1)
+        self.conv1x1 = nn.Conv2d(inplanes, inplanes // times, kernel_size=1)
 
     def forward(self, x):
         x = self.conv1x1(x)
@@ -128,10 +128,10 @@ class Boat_UNet_Part1(nn.Module):
         self.backbone = backbone
 
         if self.backbone not in ['resnet18', 'resnet34']:
-            self.de1 = ChDecrease(256)
-            self.de2 = ChDecrease(512)
-            self.de3 = ChDecrease(1024)
-            self.de4 = ChDecrease(2048)
+            self.de1 = ChDecrease(256, 4)
+            self.de2 = ChDecrease(512, 4)
+            self.de3 = ChDecrease(1024, 4)
+            self.de4 = ChDecrease(2048, 4)
 
         self.fore_pred = Pred_Fore_Rate(512, 1)
 
@@ -170,7 +170,7 @@ class Boat_UNet_Part1(nn.Module):
         output = torch.cat([x, fore_feature], dim=1)
         rate = rate.reshape(rate.shape[0])
 
-        return fore_output, rate, output
+        return fore_output, rate, output, [x0, x1, x2, x3, x4]
 
 
 class Boat_UNet_Part2(nn.Module):
@@ -178,12 +178,18 @@ class Boat_UNet_Part2(nn.Module):
         super().__init__()
         self.down = ResDown(in_channels=inplanes, backbone=backbone)
         self.backbone = backbone
+        
+        self.co_de1 = ChDecrease(128, 2)
+        self.co_de2 = ChDecrease(256, 2)
+        self.co_de3 = ChDecrease(512, 2)
+        self.co_de4 = ChDecrease(1024, 2)
 
         if self.backbone not in ['resnet18', 'resnet34']:
-            self.de1 = ChDecrease(256)
-            self.de2 = ChDecrease(512)
-            self.de3 = ChDecrease(1024)
-            self.de4 = ChDecrease(2048)
+            self.de1 = ChDecrease(256, 4)
+            self.de2 = ChDecrease(512, 4)
+            self.de3 = ChDecrease(1024, 4)
+            self.de4 = ChDecrease(2048, 4)
+
 
         self.up1 = Up(768, 256)
         self.up2 = Up(384, 128)
@@ -191,9 +197,23 @@ class Boat_UNet_Part2(nn.Module):
         self.up4 = Up(128, 64, last_cat=True)
         self.outconv = nn.Conv2d(64, num_classes, 1)
 
-    def forward(self, x):
+    def forward(self, x, down_list):
         x0, x1, x2, x3, x4 = self.down(x)
+        x0_1, x1_1, x2_1, x3_1, x4_1 = down_list
         # print(x0.shape, x1.shape, x2.shape, x3.shape, x4.shape)
+        # print(x0_1.shape, x1_1.shape, x2_1.shape, x3_1.shape, x4_1.shape)
+        
+        x4 = torch.cat([x4, x4_1], dim=1)
+        x4 = self.co_de4(x4)
+        x3 = torch.cat([x3, x3_1], dim=1)
+        x3 = self.co_de3(x3)
+        x2 = torch.cat([x2, x2_1], dim=1)
+        x2 = self.co_de2(x2)
+        x1 = torch.cat([x1, x1_1], dim=1)
+        x1 = self.co_de1(x1)
+        x0 = torch.cat([x0, x0_1], dim=1)
+        x0 = self.co_de1(x0)
+        
         if self.backbone not in ['resnet18', 'resnet34']:
 
             x1 = self.de1(x1)

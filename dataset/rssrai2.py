@@ -53,7 +53,7 @@ class Rssrai(Dataset):
 
     def __getitem__(self, idx):
         if self._mode != "test":
-            return self.load_numpy(idx)
+            return self.load_numpy(idx, self._mode)
         else:
             return self.load_test_numpy(idx)
 
@@ -61,14 +61,18 @@ class Rssrai(Dataset):
         img = np.load(os.path.join(self._image_dir, self._test_img_list[idx]))
         return img, self._test_img_list[idx]
 
-    def load_numpy(self, idx):
+    def load_numpy(self, idx, mode):
         image = np.load(os.path.join(self._image_dir, self._data_list[idx]))
         mask = np.load(os.path.join(self._label_dir, self._data_list[idx]))
         binary_dict = np.load(os.path.join(self._rate_dir, self._data_list[idx]), allow_pickle=True).item()
         binary_mask, rate = binary_dict['binary_mask'], binary_dict['rate']
         
         sample = {'image': image, 'label': mask}
-        sample = self._train_enhance(sample)
+        if mode == 'train':
+            sample = self._train_enhance(sample)
+        else:
+            sample = self._valid_enhance(sample)
+            
         sample['image'] = sample['image'].transpose((2, 0, 1))
         sample['binary_mask'] = binary_mask
         sample['rate'] = rate
@@ -97,6 +101,7 @@ class Rssrai(Dataset):
         compose = A.Compose([
             A.Normalize(mean=self.mean, std=self.std, p=1)
         ], additional_targets={'image': 'image', 'label': 'mask'})
+        sample['image'] = sample['image'].transpose((1, 2, 0))
         return compose(**sample)    
 
     def _train_enhance(self, sample):
