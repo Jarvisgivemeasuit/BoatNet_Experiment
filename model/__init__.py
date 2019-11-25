@@ -1,7 +1,7 @@
 import os
 import torch
 from model.resunet.resunet import UNet
-from model.boat_resunet.boat_resunet import Boat_UNet
+# from model.boat_resunet.boat_resunet import Boat_UNet
 
 
 def get_model(model_name, backbone, inplanes, num_classes):

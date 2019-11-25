@@ -6,6 +6,8 @@ from torchsummary import summary
 
 from . import torchvision_resnet
 from .boat_resunet_utils import initialize_weights
+# import torchvision_resnet
+# from boat_resunet_utils import *
 import torch.nn.functional as F
 
 BACKBONE = 'resnet50'
@@ -18,7 +20,7 @@ class ResDown(nn.Module):
         model = getattr(torchvision_resnet, backbone)(pretrained)
         if in_channels != 3:
             self.layer0 = nn.Sequential(
-                nn.Conv2d(in_channels, 64, 3, stride=1, padding=1, bias=False),
+                nn.Conv2d(in_channels, 64, 3, stride=2, padding=1, bias=False),
                 nn.BatchNorm2d(64),
                 nn.LeakyReLU(inplace=True),
                 # nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
@@ -85,14 +87,14 @@ class Double_conv(nn.Module):
 
 
 class Up(nn.Module):
-    def __init__(self, inplanes, planes, bilinear=False, last_cat=False):
+    def __init__(self, u_inplanes, d_inplanes, d_planes, bilinear=False, last_cat=False):
         super(Up, self).__init__()
         if bilinear:
             self.up = nn.Upsample(scale_factor=2, mode="bilinear", align_corners=True)
         else:
-            self.up = nn.ConvTranspose2d(inplanes // 3 * 2, inplanes // 3 * 2, 2, stride=2)
+            self.up = nn.ConvTranspose2d(u_inplanes, u_inplanes, 4, stride=2)
             # self.up = nn.ConvTranspose2d(512, 512, 2, stride=8)
-        self.conv = Double_conv(inplanes, planes)
+        self.conv = Double_conv(d_inplanes, d_planes)
         self.last_cat = last_cat
 
     def forward(self, x1, x2):
@@ -135,23 +137,25 @@ class Boat_UNet_Part1(nn.Module):
 
         self.fore_pred = Pred_Fore_Rate(512, 1)
 
-        self.up1 = Up(768, 256)
-        self.up2 = Up(384, 128)
-        self.up3 = Up(192, 64)
-        self.up4 = Up(128, 64, last_cat=True)
+        self.up1 = Up(512, 768, 256)
+        self.up2 = Up(256, 384, 128)
+        self.up3 = Up(128, 192, 64)
+        self.up4 = Up(64, 128, 64, last_cat=True)
+        self.up5 = Up(64, 68, 64)
         self.outconv = nn.Conv2d(64, num_classes, 1)
 
         self.softmax = nn.Softmax(dim=1)
 
     def forward(self, x):
+        ori_x = x
         x0, x1, x2, x3, x4 = self.down(x)
 
-        # print(x0.shape, x1.shape, x2.shape, x3.shape, x4.shape)
         if self.backbone not in ['resnet18', 'resnet34']:
             x1 = self.de1(x1)
             x2 = self.de2(x2)
             x3 = self.de3(x3)
             x4 = self.de4(x4)
+        # print(x0.shape, x1.shape, x2.shape, x3.shape, x4.shape)
 
         rate = self.fore_pred(x4)
 
@@ -159,6 +163,7 @@ class Boat_UNet_Part1(nn.Module):
         x = self.up2(x, x2)
         x = self.up3(x, x1)
         x = self.up4(x, x0)
+        x = self.up5(x, ori_x)
 
         fore_output = self.outconv(x)
         
@@ -191,13 +196,15 @@ class Boat_UNet_Part2(nn.Module):
             self.de4 = ChDecrease(2048, 4)
 
 
-        self.up1 = Up(768, 256)
-        self.up2 = Up(384, 128)
-        self.up3 = Up(192, 64)
-        self.up4 = Up(128, 64, last_cat=True)
+        self.up1 = Up(512, 768, 256)
+        self.up2 = Up(256, 384, 128)
+        self.up3 = Up(128, 192, 64)
+        self.up4 = Up(64, 128, 64, last_cat=True)
+        self.up5 = Up(64, 129, 64)
         self.outconv = nn.Conv2d(64, num_classes, 1)
 
     def forward(self, x, down_list):
+        ori_x = x
         x0, x1, x2, x3, x4 = self.down(x)
         x0_1, x1_1, x2_1, x3_1, x4_1 = down_list
         # print(x0.shape, x1.shape, x2.shape, x3.shape, x4.shape)
@@ -225,22 +232,23 @@ class Boat_UNet_Part2(nn.Module):
         x = self.up2(x, x2)
         x = self.up3(x, x1)
         x = self.up4(x, x0)
+        x = self.up5(x, ori_x)
         output = self.outconv(x)
 
         return output
 
 
-class Boat_UNet(nn.Module):
-    def __init__(self, inplanes, num_classes, backbone1, backbone2):
-        super().__init__()
-        self.part1 = Boat_UNet_Part1(inplanes, 1, backbone1)
-        self.part2 = Boat_UNet_Part2(65, num_classes, backbone2)
+# class Boat_UNet(nn.Module):
+#     def __init__(self, inplanes, num_classes, backbone1, backbone2):
+#         super().__init__()
+#         self.part1 = Boat_UNet_Part1(inplanes, 1, backbone1)
+#         self.part2 = Boat_UNet_Part2(65, num_classes, backbone2)
 
-    def forward(self, x):
-        fore_output, pred_rate, x = self.part1(x)
-        output = self.part2(x)
+#     def forward(self, x):
+#         fore_output, pred_rate, x = self.part1(x)
+#         output = self.part2(x)
 
-        return fore_output, pred_rate, output
+#         return fore_output, pred_rate, output
 
 
 # net = Boat_UNet_Part1(4, 1, 'resnet50')

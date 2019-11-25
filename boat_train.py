@@ -131,7 +131,6 @@ class Trainer:
             save_model(self.net, self.args.model_name, self.args.backbone1, self.args.backbone2)
 
     def validation(self, epoch):
-
         self.val_metric.miou.reset()
         self.val_metric.kappa.reset()
         self.val_metric.pixacc.reset()
@@ -167,7 +166,8 @@ class Trainer:
             self.val_metric.kappa.update(pred_nd, tar)
 
             # self.visualize_batch_image(img, bmask, output_bmask, epoch, idx, 2)
-            self.visualize_batch_image(img, tar, pred_nd, epoch, idx, 2)
+            if idx % 10 == 0:
+                self.visualize_batch_image(img, tar, pred_nd, epoch, idx, 2)
 
             batch_time.update(time.time() - starttime)
             starttime = time.time()
