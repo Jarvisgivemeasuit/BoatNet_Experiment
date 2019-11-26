@@ -91,7 +91,7 @@ class Trainer:
             loss1 = self.criterion0(output_rate, rate)
             loss2 = self.criterion1(output_bmask, bmask.long())
             
-            pred_nd = self.net_nd(pred_st, up_list)
+            pred_nd = self.net_nd(pred_st, down_list, up_list)
             loss3 = self.criterion1(pred_nd, tar.long())
 
             loss = loss1 + loss2 + loss3
@@ -131,7 +131,8 @@ class Trainer:
         if self.train_metric.pixacc.get() > self.best_pred and self.train_metric.miou.get() > self.best_miou:
             self.best_pred = self.train_metric.pixacc.get()
             self.best_miou = self.train_metric.miou.get()
-            save_model(self.net_st, self.net_nd, self.args.model_name, self.args.backbone1, self.args.backbone2)
+            save_model(self.net_st, self.net_nd, self.args.model_name, 
+                       self.args.backbone1, self.args.backbone2, self.args.annotations)
 
     def validation(self, epoch):
         self.val_metric.miou.reset()

@@ -32,25 +32,27 @@ class Tester:
         batch_time = AverageMeter()
         starttime = time.time()
         
-        self.net = torch.load(param_path)
-        if isinstance(self.net, torch.nn.DataParallel):
-            self.net = self.net.module
+        self.net_st = torch.load(param_path[0])
+        self.net_nd = torch.load(param_path[1])
+        
+        if isinstance(self.net_st, torch.nn.DataParallel):
+            self.net_st = self.net_st.module
+            self.net_nd = self.net_nd.module
 
         self.net.eval()
 
         num_test = len(self.test_loader)
         bar = Bar('testing', max=num_test)
 
-        for idx, sample in enumerate(self.test_loader):
-            img, tar, bmask, rate = sample['image'], sample['label'], sample['binary_mask'], sample['rate']
+        for idx, [img, img_file] in enumerate(self.test_loader):
             if self.args.cuda:
-                img, tar, bmask, rate = img.cuda(), tar.cuda(), bmask.cuda(), rate.cuda()
+                img = img.cuda()
 
             with torch.no_grad():
                 output_bmask, output_rate, pred_st, down_list, up_list = self.net_st(img)
                 output = self.net_nd(pred_st, down_list)
 
-            final_save_path = make_sure_path_exists(os.path.join(save_path, f"{self.args.model_name}-{self.args.backbone}"))
+            final_save_path = make_sure_path_exists(os.path.join(save_path, f"{self.args.model_name}-{self.args.backbone1}-{self.args.backbone2}"))
             output = torch.argmax(output, dim=1).cpu().numpy()
             output_rgb_tmp = decode_segmap(output[0], self.num_classes).astype(np.uint8)
             output_rgb_tmp =Image.fromarray(output_rgb_tmp)
@@ -76,7 +78,9 @@ class Tester:
 
 def test():
     save_result_path = '/home/arron/Documents/grey/paper/rssrai_results'
-    param_path = '/home/arron/Documents/grey/paper/model_saving/resnet50-resnet18-boat_resunet-bast_pred.pth'
+    param_path1 = '/home/arron/Documents/grey/paper/model_saving/'
+    param_path2 = ''
+    param_path = [param_path1, param_path2]
     tester = Tester(Args)
 
     print("==> Start testing")

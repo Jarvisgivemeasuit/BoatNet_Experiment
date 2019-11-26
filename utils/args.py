@@ -12,6 +12,8 @@ class Args:
         self.backbone = 'resnet50'
         self.backbone1 = 'resnet50'
         self.backbone2 = 'resnet18'
+        self.annotations = 'deconv-bilinear'
+
         self.epochs = 100
         self.lr = 0.01
         self.no_val = False
