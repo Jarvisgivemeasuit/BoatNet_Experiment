@@ -10,7 +10,7 @@ class ResDown(nn.Module):
     def __init__(self, backbone=BACKBONE, in_channels=3, pretrained=True,
                  zero_init_residual=False):
         super(ResDown, self).__init__()
-        model = getattr(torchvision_resnet, backbone)(pretrained)
+        model = getattr(torchvision_resnet, BACKBONE)(pretrained)
         if in_channels != 3:
             self.layer0 = nn.Sequential(
                 nn.Conv2d(in_channels, 64, 3, stride=1, padding=1, bias=False),

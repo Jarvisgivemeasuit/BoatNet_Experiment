@@ -80,7 +80,7 @@ class Trainer:
 
             self.optimizer.zero_grad()
             output = self.net(img)
-            loss = self.criterion(output, tar)
+            loss = self.criterion(output, tar.long())
             losses.update(loss.item())
 
             self.train_metric.pixacc.update(output, tar)
@@ -115,7 +115,7 @@ class Trainer:
         if self.train_metric.pixacc.get() > self.best_pred and self.train_metric.miou.get() > self.best_miou:
             self.best_pred = self.train_metric.pixacc.get()
             self.best_miou = self.train_metric.miou.get()
-            save_model(self.net, self.args.model_name, self.args.backbone)
+            save_model(self.net, self.args.model_name, 'resnet50')
 
     def validation(self, epoch):
 
@@ -138,7 +138,7 @@ class Trainer:
                 img, tar = img.cuda(), tar.cuda()
             with torch.no_grad():
                 output = self.net(img)
-            loss = self.criterion(output, tar)
+            loss = self.criterion(output, tar.long())
             losses.update(loss.item())
 
             self.val_metric.pixacc.update(output, tar)

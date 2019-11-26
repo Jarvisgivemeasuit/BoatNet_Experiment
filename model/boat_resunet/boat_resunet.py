@@ -92,7 +92,7 @@ class Up(nn.Module):
         if bilinear:
             self.up = nn.Upsample(scale_factor=2, mode="bilinear", align_corners=True)
         else:
-            self.up = nn.ConvTranspose2d(u_inplanes, u_inplanes, 4, stride=2)
+            self.up = nn.ConvTranspose2d(u_inplanes, u_inplanes, 2, stride=2)
             # self.up = nn.ConvTranspose2d(512, 512, 2, stride=8)
         self.conv = Double_conv(d_inplanes, d_planes)
         self.last_cat = last_cat
@@ -160,10 +160,15 @@ class Boat_UNet_Part1(nn.Module):
         rate = self.fore_pred(x4)
 
         x = self.up1(x4, x3)
+        output0 = x
         x = self.up2(x, x2)
+        output1 = x
         x = self.up3(x, x1)
+        output2 = x
         x = self.up4(x, x0)
+        output3 = x
         x = self.up5(x, ori_x)
+        output4 = x
 
         fore_output = self.outconv(x)
         
@@ -175,7 +180,7 @@ class Boat_UNet_Part1(nn.Module):
         output = torch.cat([x, fore_feature], dim=1)
         rate = rate.reshape(rate.shape[0])
 
-        return fore_output, rate, output, [x0, x1, x2, x3, x4]
+        return fore_output, rate, output, [ori_x, x0, x1, x2, x3, x4]
 
 
 class Boat_UNet_Part2(nn.Module):
@@ -196,17 +201,17 @@ class Boat_UNet_Part2(nn.Module):
             self.de4 = ChDecrease(2048, 4)
 
 
-        self.up1 = Up(512, 768, 256)
-        self.up2 = Up(256, 384, 128)
-        self.up3 = Up(128, 192, 64)
-        self.up4 = Up(64, 128, 64, last_cat=True)
-        self.up5 = Up(64, 129, 64)
+        self.up1 = Up(512, 768, 256, bilinear=True)
+        self.up2 = Up(256, 384, 128, bilinear=True)
+        self.up3 = Up(128, 192, 64, bilinear=True)
+        self.up4 = Up(64, 128, 64, bilinear=True, last_cat=True)
+        self.up5 = Up(64, 133, 64, bilinear=True)
         self.outconv = nn.Conv2d(64, num_classes, 1)
 
     def forward(self, x, down_list):
-        ori_x = x
+        input_x = x
         x0, x1, x2, x3, x4 = self.down(x)
-        x0_1, x1_1, x2_1, x3_1, x4_1 = down_list
+        ori_x, x0_1, x1_1, x2_1, x3_1, x4_1 = down_list
         # print(x0.shape, x1.shape, x2.shape, x3.shape, x4.shape)
         # print(x0_1.shape, x1_1.shape, x2_1.shape, x3_1.shape, x4_1.shape)
         
@@ -232,6 +237,7 @@ class Boat_UNet_Part2(nn.Module):
         x = self.up2(x, x2)
         x = self.up3(x, x1)
         x = self.up4(x, x0)
+        ori_x = torch.cat([input_x, ori_x], dim=1)
         x = self.up5(x, ori_x)
         output = self.outconv(x)
 

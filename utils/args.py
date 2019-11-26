@@ -3,7 +3,7 @@ import os
 class Args:
 
     def __init__(self):
-        self.tr_batch_size = 16
+        self.tr_batch_size = 14
         self.vd_batch_size = 10
         self.num_workers = 8
         self.inplanes = 4
@@ -12,7 +12,7 @@ class Args:
         self.backbone = 'resnet50'
         self.backbone1 = 'resnet50'
         self.backbone2 = 'resnet18'
-        self.epochs = 80
+        self.epochs = 100
         self.lr = 0.01
         self.no_val = False
 

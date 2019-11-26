@@ -52,7 +52,7 @@ class Trainer:
 
         self.criterion0 = nn.MSELoss()
         self.criterion1 = nn.CrossEntropyLoss(ignore_index=16).cuda()
-        self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, [40, 60], 0.3)
+        self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, mode='min', factor=0.3, patience=4)
         self.Metric = namedtuple('Metric', 'pixacc miou kappa')
 
         self.train_metric = self.Metric(pixacc=metrics.PixelAccuracy(),
@@ -110,16 +110,18 @@ class Trainer:
             batch_time.update(time.time() - starttime)
             starttime = time.time()
 
-            bar.suffix = '({batch}/{size}) Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss: {loss:.4f} | Acc: {Acc: .4f} | mIoU: {mIoU: .4f} | kappa: {kappa: .4f}'.format(
+            bar.suffix = '({batch}/{size})Batch:{bt:.2f}s, Total:{total:}, ETA:{eta:}, Loss:{loss1:.4f},{loss2:.4f},{loss3:.4f}, Acc:{Acc:.4f}, mIoU:{mIoU:.4f}, kappa:{kappa:.4f}'.format(
                 batch=idx + 1,
-                size=len(self.train_loader),
+                size=len(self.val_loader),
                 bt=batch_time.avg,
                 total=bar.elapsed_td,
                 eta=bar.eta_td,
-                loss=losses.avg,
-                mIoU=self.train_metric.miou.get(),
-                Acc=self.train_metric.pixacc.get(),
-                kappa=self.train_metric.kappa.get()
+                loss1=loss1,
+                loss2=loss2,
+                loss3=loss3,
+                mIoU=self.val_metric.miou.get(),
+                Acc=self.val_metric.pixacc.get(),
+                kappa=self.val_metric.kappa.get()
             )
             bar.next()
         bar.finish()
@@ -165,20 +167,23 @@ class Trainer:
             self.val_metric.miou.update(pred_nd, tar)
             self.val_metric.kappa.update(pred_nd, tar)
 
-            # self.visualize_batch_image(img, bmask, output_bmask, epoch, idx, 2)
+            
             if idx % 10 == 0:
+                self.visualize_batch_image(img, bmask, output_bmask, epoch, idx, 1)
                 self.visualize_batch_image(img, tar, pred_nd, epoch, idx, 2)
 
             batch_time.update(time.time() - starttime)
             starttime = time.time()
 
-            bar.suffix = '({batch}/{size}) Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss: {loss:.4f} | Acc: {Acc: .4f} | mIoU: {mIoU: .4f} | kappa: {kappa: .4f}'.format(
+            bar.suffix = '({batch}/{size})Batch:{bt:.2f}s, Total:{total:}, ETA:{eta:}, Loss:{loss1:.4f},{loss2:.4f},{loss3:.4f}, Acc:{Acc:.4f}, mIoU:{mIoU:.4f}, kappa:{kappa:.4f}'.format(
                 batch=idx + 1,
                 size=len(self.val_loader),
                 bt=batch_time.avg,
                 total=bar.elapsed_td,
                 eta=bar.eta_td,
-                loss=losses.avg,
+                loss1=loss1,
+                loss2=loss2,
+                loss3=loss3,
                 mIoU=self.val_metric.miou.get(),
                 Acc=self.val_metric.pixacc.get(),
                 kappa=self.val_metric.kappa.get()
