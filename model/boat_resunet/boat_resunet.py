@@ -168,7 +168,6 @@ class Boat_UNet_Part1(nn.Module):
         x = self.up4(x, x0)
         output3 = x
         x = self.up5(x, ori_x)
-        output4 = x
 
         fore_output = self.outconv(x)
         
@@ -180,7 +179,7 @@ class Boat_UNet_Part1(nn.Module):
         output = torch.cat([x, fore_feature], dim=1)
         rate = rate.reshape(rate.shape[0])
 
-        return fore_output, rate, output, [ori_x, x0, x1, x2, x3, x4], [output4, output3, output2, output1, output0]
+        return fore_output, rate, output, [ori_x, x0, x1, x2, x3, x4], [output3, output2, output1, output0]
 
 
 class Boat_UNet_Part2(nn.Module):
@@ -212,12 +211,10 @@ class Boat_UNet_Part2(nn.Module):
         input_x = x
         x0, x1, x2, x3, x4 = self.down(x)
         ori_x, x0_0, x1_0, x2_0, x3_0, x4_0 = down_list
-        x0_1, x1_1, x2_1, x3_1, x4_1 = up_list
+        x0_1, x1_1, x2_1, x3_1 = up_list
         # print(x0.shape, x1.shape, x2.shape, x3.shape, x4.shape)
         # print(x0_1.shape, x1_1.shape, x2_1.shape, x3_1.shape, x4_1.shape)
         
-        x4 = torch.cat([x4, x4_1], dim=1)
-        x4 = self.co_de4(x4)
         x3 = torch.cat([x3, x3_1], dim=1)
         x3 = self.co_de3(x3)
         x2 = torch.cat([x2, x2_1], dim=1)
@@ -238,8 +235,9 @@ class Boat_UNet_Part2(nn.Module):
         x = self.up2(x, x2)
         x = self.up3(x, x1)
         x = self.up4(x, x0)
-        # ori_x = torch.cat([input_x, ori_x], dim=1)
-        x = self.up5(x, input_x)
+        ori_x = torch.cat([input_x, ori_x], dim=1)
+        # print(ori_x.shape, x.shape)
+        x = self.up5(x, ori_x)
         output = self.outconv(x)
 
         return output
@@ -252,14 +250,19 @@ class Boat_UNet(nn.Module):
         self.part2 = Boat_UNet_Part2(65, num_classes, backbone2)
 
     def forward(self, x):
-        fore_output, pred_rate, x, down_list, up_list = self.part1(x)
+        output_bmask, output_rate, x, down_list, up_list = self.part1(x)
         output = self.part2(x, down_list, up_list)
 
-        return fore_output, pred_rate, output
+        return output_bmask, output_rate, output
 
 
 # net = Boat_UNet_Part1(4, 1, 'resnet50')
 # summary(net.cuda(), (4, 256, 256))
 
-net = Boat_UNet(4, 16, 'resnet50', 'resnet18')
-summary(net.cuda(), (4, 256, 256))
+# net = Boat_UNet(4, 16, 'resnet50', 'resnet18')
+# summary(net.cuda(), (4, 256, 256))
+
+# net = Boat_UNet(4, 16, 'resnet50', 'resnet18').cuda()
+# test_data = torch.randn([2, 4, 256, 256]).cuda()
+# aa, bb, cc = net(test_data)
+# print(aa.shape, bb.shape, cc.shape)

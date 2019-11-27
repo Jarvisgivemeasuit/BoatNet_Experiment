@@ -2,7 +2,7 @@ import torch
 import numpy as np
 
 class PixelAccuracy:
-    def __init__(self, ignore_index=-100, eps=1e-7):
+    def __init__(self, ignore_index=-1, eps=1e-7):
         self.num_correct = 0
         self.num_instance = 0
         self.ignore_index = ignore_index
@@ -15,8 +15,8 @@ class PixelAccuracy:
             pred = pred > 0.5
         else:
             pred = torch.argmax(pred, dim=1)
-        self.num_correct += ((pred.long() == target.long()) *
-                             ignore_mask).sum().item()
+
+        self.num_correct += ((pred.long() == target.long()) * ignore_mask).sum().item()
         self.num_instance += ignore_mask.sum().item()
 
     def get(self):
