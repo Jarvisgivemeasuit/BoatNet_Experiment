@@ -9,8 +9,7 @@ sys.path.append("/home/arron/Documents/grey/paper/experiment")
 
 from utils.args import Args
 from utils.utils import *
-from model import get_model, save_model
-from dataset.rssrai import Rssrai
+from dataset.rssrai2 import Rssrai
 
 import torch
 from torch import nn
@@ -23,18 +22,19 @@ import numpy as np
 class Tester:
     def __init__(self, Args):
         self.args = Args()
-        self.test_set = Rssrai(mode='test', batch_size=2)
+        self.test_set = Rssrai(mode='test')
         self.num_classes = self.test_set.NUM_CLASSES
-        self.test_loader = DataLoader(self.test_set, batch_size=2, shuffle=False, num_workers=self.args.num_workers)
+        self.test_loader = DataLoader(self.test_set, batch_size=10, 
+                                      shuffle=False, num_workers=self.args.num_workers)
 
     def testing(self, param_path, save_path):
 
         batch_time = AverageMeter()
         starttime = time.time()
-        
+
         self.net_st = torch.load(param_path[0])
         self.net_nd = torch.load(param_path[1])
-        
+
         if isinstance(self.net_st, torch.nn.DataParallel):
             self.net_st = self.net_st.module
             self.net_nd = self.net_nd.module

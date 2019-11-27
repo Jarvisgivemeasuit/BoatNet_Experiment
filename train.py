@@ -27,7 +27,7 @@ class Trainer:
     def __init__(self, Args):
         self.num_classes = Rssrai.NUM_CLASSES
         self.args = Args
-        self.start_epoch = 1
+        self.start_epoch = 43
         self.epochs = self.args.epochs
         self.best_pred = 0
         self.best_miou = 0
@@ -40,9 +40,11 @@ class Trainer:
         self.val_loader = DataLoader(val_set, batch_size=self.args.vd_batch_size,
                                      shuffle=False, num_workers=self.args.num_workers)
 
-        self.net = get_model(self.args.model_name, self.args.backbone, self.args.inplanes, self.num_classes).cuda()
+        # self.net = get_model(self.args.model_name, self.args.backbone, self.args.inplanes, self.num_classes).cuda()
+        self.net = torch.load('/home/arron/Documents/grey/paper/model_saving/resnet50-resunet-bast_pred.pth')
         self.optimizer = torch.optim.SGD(self.net.parameters(), lr=self.args.lr, momentum=0.9)
         if self.args.apex:
+            self.net = self.net.module
             self.net, self.optimizer = amp.initialize(self.net, self.optimizer, opt_level='O1')
         self.net = nn.DataParallel(self.net, self.args.gpu_ids)
 

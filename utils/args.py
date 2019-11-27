@@ -3,7 +3,7 @@ import os
 class Args:
 
     def __init__(self):
-        self.tr_batch_size = 14
+        self.tr_batch_size = 16
         self.vd_batch_size = 10
         self.num_workers = 8
         self.inplanes = 4

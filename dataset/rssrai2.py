@@ -18,12 +18,11 @@ from .rssrai_utils2 import *
 class Rssrai(Dataset):
     NUM_CLASSES = 16
     
-    def __init__(self, mode='train', batch_size=256, base_dir=Path.get_root_path('rssrai_grey')):
+    def __init__(self, mode='train', base_dir=Path.get_root_path('rssrai_grey')):
         assert mode in ['train', 'val', 'test']
         super().__init__()
 
         self._mode = mode
-        self._batch_size = batch_size
         self._base_dir = base_dir
         self.mean = mean
         self.std = std
@@ -42,11 +41,10 @@ class Rssrai(Dataset):
             self._data_list = os.listdir(self._image_dir)
             self.len = len(self._data_list)
 
-        # if self._mode == 'test':
-        #     self._image_dir = os.path.join(self._base_dir, 'test/test_split/')
-        #     self._test_img_list = os.listdir(self._image_dir)
-        #     self._test_name_list = [name.split('.')[0] for name in self._test_img_list]
-        #     self.len = len(self._test_name_list)
+        if self._mode == 'test':
+            self._image_dir = os.path.join(self._base_dir, 'test_split_256')
+            self._data_list = os.listdir(self._image_dir)
+            self.len = len(self._data_list)
 
     def __len__(self):
         return self.len
