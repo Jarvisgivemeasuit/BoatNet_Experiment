@@ -245,21 +245,21 @@ class Boat_UNet_Part2(nn.Module):
         return output
 
 
-# class Boat_UNet(nn.Module):
-#     def __init__(self, inplanes, num_classes, backbone1, backbone2):
-#         super().__init__()
-#         self.part1 = Boat_UNet_Part1(inplanes, 1, backbone1)
-#         self.part2 = Boat_UNet_Part2(65, num_classes, backbone2)
+class Boat_UNet(nn.Module):
+    def __init__(self, inplanes, num_classes, backbone1, backbone2):
+        super().__init__()
+        self.part1 = Boat_UNet_Part1(inplanes, 1, backbone1)
+        self.part2 = Boat_UNet_Part2(65, num_classes, backbone2)
 
-#     def forward(self, x):
-#         fore_output, pred_rate, x = self.part1(x)
-#         output = self.part2(x)
+    def forward(self, x):
+        fore_output, pred_rate, x, down_list, up_list = self.part1(x)
+        output = self.part2(x, down_list, up_list)
 
-#         return fore_output, pred_rate, output
+        return fore_output, pred_rate, output
 
 
 # net = Boat_UNet_Part1(4, 1, 'resnet50')
 # summary(net.cuda(), (4, 256, 256))
 
-# net = Boat_UNet_Part2(65, 16, 'resnet18')
-# summary(net.cuda(), (65, 256, 256))
+net = Boat_UNet(4, 16, 'resnet50', 'resnet18')
+summary(net.cuda(), (4, 256, 256))

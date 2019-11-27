@@ -75,8 +75,8 @@ class Tester:
 
 
 def test():
-    save_result_path = '/home/arron/Documents/grey/paper/rssrai_results'
-    param_path = '/home/arron/Documents/grey/paper//model_saving/resnet50-resunet-acc0.9755299123128255-miou0.9348706210413473.pth'
+    save_result_path = '/home/arron/dataset/rssrai_grey/results/tmp_output'
+    param_path = '/home/arron/Documents/grey/paper/model_saving/'
     tester = Tester(Args)
 
     print("==> Start testing")

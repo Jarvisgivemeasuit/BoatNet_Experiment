@@ -27,7 +27,7 @@ class Trainer:
     def __init__(self, Args):
         self.num_classes = Rssrai.NUM_CLASSES
         self.args = Args
-        self.start_epoch = 43
+        self.start_epoch = 64
         self.epochs = self.args.epochs
         self.best_pred = 0
         self.best_miou = 0

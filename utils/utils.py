@@ -82,8 +82,8 @@ def get_labels(label_number):
     return label_colors[label_number]
 
 def make_dataset(tr_batch_size, vd_batch_size):
-    train_set = rssrai2.Rssrai(mode='train', batch_size=tr_batch_size)
-    val_set = rssrai2.Rssrai(mode='val', batch_size=vd_batch_size)
+    train_set = rssrai2.Rssrai(mode='train')
+    val_set = rssrai2.Rssrai(mode='val')
     return train_set, val_set, train_set.NUM_CLASSES
 
 def decode_segmap(label_mask, label_number):
@@ -369,9 +369,9 @@ class FocalLoss(nn.Module):
 
 
 if __name__ == '__main__':
-    path = '/home/arron/dataset/rssrai2019/test/test_img'
-    save_path = '/home/arron/Documents/grey/paper/performs' 
-    res_path = '/home/arron/Documents/grey/paper/rssrai_results/resunet-resnet50'
+    path = '/home/arron/dataset/rssrai_grey/test_split_256'
+    save_path = '/home/arron/dataset/rssrai_grey/results/resunet50' 
+    res_path = '/home/arron/dataset/rssrai_grey/results/tmp_output'
     supermerger = SuperMerger(path, res_path, save_path)
     supermerger.merge_image()
     # print(supermerger.ori_list)

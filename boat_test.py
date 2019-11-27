@@ -77,7 +77,7 @@ class Tester:
         print('[Epoch: %d, numImages: %5d]' % (epoch, num_train * self.args.tr_batch_size))
 
 def test():
-    save_result_path = '/home/arron/Documents/grey/paper/rssrai_results'
+    save_result_path = '/home/arron/dataset/rssrai_grey/results/tmp_output'
     param_path1 = '/home/arron/Documents/grey/paper/model_saving/'
     param_path2 = ''
     param_path = [param_path1, param_path2]
