@@ -294,7 +294,6 @@ class FocalLoss(nn.Module):
         class_mask = torch.zeros([N, pred.shape[2], pred.shape[3], C])
         class_mask = class_mask.scatter_(3, target_index, 1.)
         class_mask = class_mask.transpose(1, 3)
-        
         class_mask = class_mask.view(pred.shape)
         
         logsoft_pred = F.log_softmax(pred)
