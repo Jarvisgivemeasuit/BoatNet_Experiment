@@ -50,10 +50,12 @@ class Trainer:
         self.net = nn.DataParallel(self.net, self.args.gpu_ids)
 
         self.criterion0 = SoftCrossEntropyLoss().cuda()
-        # self.criterion1 = FocalLoss(self.num_classes).cuda()
-        # self.criterion2 = FocalLoss(self.num_classes).cuda()
-        self.criterion1 = nn.CrossEntropyLoss(reduction='none').cuda()
-        self.criterion2 = nn.CrossEntropyLoss(reduction='none', ignore_index=16).cuda()
+        # self.criterion1 = FocalLoss().cuda()
+        # self.criterion2 = FocalLoss().cuda()
+        
+        # self.criterion0 = nn.MSELoss().cuda()
+        self.criterion1 = nn.CrossEntropyLoss().cuda()
+        self.criterion2 = nn.CrossEntropyLoss(ignore_index=16).cuda()
         self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, mode='min', factor=0.3, patience=4)
 
         self.Metric = namedtuple('Metric', 'pixacc miou kappa')
@@ -92,8 +94,8 @@ class Trainer:
             pred_bmask, pred_rate, pred = self.net(img)
 
             loss1 = self.criterion0(pred_rate, rate)
-            loss2 = self.criterion1(pred_bmask, bmask.long()).mean()
-            loss3 = self.criterion2(pred, tar.long()).mean()
+            loss2 = self.criterion1(pred_bmask, bmask.long())
+            loss3 = self.criterion2(pred, tar.long())
 
             loss = loss1 + loss2 + loss3
             losses1.update(loss1)

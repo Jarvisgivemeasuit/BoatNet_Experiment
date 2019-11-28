@@ -271,7 +271,7 @@ class SoftCrossEntropyLoss(nn.Module):
 
     def forward(self, pred, target):
         mask = target != self.ignore_index
-        pred = F.log_softmax(pred)
+        pred = F.log_softmax(pred, dim=0)
         loss = -pred * target
         loss = loss * mask.float()
         # print(loss, pred, target, mask)
@@ -279,18 +279,35 @@ class SoftCrossEntropyLoss(nn.Module):
 
 
 class FocalLoss(nn.Module):
-    def __init__(self, num_classes, alpha=1, gamma=2, reducation='mean'):
+    def __init__(self, alpha=1, gamma=2, reducation='mean'):
         super().__init__()
-        self.num_classes = num_classes
         self.alpha = Variable(torch.tensor(alpha))
         self.gamma = gamma
         self.reducation = reducation
         
     def forward(self, pred, target):
+        N = pred.shape[0]
+        C = pred.shape[1]
+        num_pixels = pred.shape[2] * pred.shape[3]
+        
+        target_index = target.view(target.shape[0], target.shape[1], target.shape[2], 1)
+        class_mask = torch.zeros([N, pred.shape[2], pred.shape[3], C])
+        class_mask = class_mask.scatter_(3, target_index, 1.)
+        class_mask = class_mask.transpose(1, 3)
+        
+        class_mask = class_mask.view(pred.shape)
+        
         logsoft_pred = F.log_softmax(pred)
         soft_pred = F.softmax(pred)
-        loss = -self.alpha * (1 - soft_pred) * logsoft_pred
-        return loss.mean()
+        
+        loss = -self.alpha * ((1 - soft_pred)) ** self.gamma * logsoft_pred
+        loss = loss * class_mask
+        loss = loss.sum(1)
+
+        if self.reducation == 'mean':
+            return loss.sum() / (class_mask.sum() + self.eps)
+        else:
+            return loss.sum()
 
 
 if __name__ == '__main__':

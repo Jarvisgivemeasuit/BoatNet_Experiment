@@ -61,10 +61,12 @@ class Pred_Fore_Rate(nn.Module):
         super().__init__()
         self.conv1x1 = nn.Conv2d(inplanes, planes, 1)
         self.pool = nn.AdaptiveAvgPool2d(1)
+        self.softmax = nn.Softmax(dim=1)
 
     def forward(self, x):
         x = self.conv1x1(x)
         x = self.pool(x)
+        x = self.softmax(x)
 
         return x
 

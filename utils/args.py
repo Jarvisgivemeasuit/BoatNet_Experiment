@@ -15,7 +15,7 @@ class Args:
         self.annotations = 'deconv-bilinear'
 
         self.epochs = 100
-        self.lr = 0.01
+        self.lr = 0.001
         self.no_val = False
 
         self.gpu_ids = [0, 1]
