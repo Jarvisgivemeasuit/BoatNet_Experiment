@@ -81,7 +81,7 @@ def get_labels(label_number):
     label_colors = {19: label_19, 21: label_21, 16: label_16}
     return label_colors[label_number]
 
-def make_dataset(tr_batch_size, vd_batch_size):
+def make_dataset():
     train_set = rssrai2.Rssrai(mode='train')
     val_set = rssrai2.Rssrai(mode='val')
     return train_set, val_set, train_set.NUM_CLASSES
@@ -260,6 +260,22 @@ class SuperMerger:
         split_tmp = img_file.split('_')[-2:]
         y, x = split_tmp[0], split_tmp[1].replace('.tif', '')
         return img_file.replace("_".join(split_tmp), ''), x, y
+
+
+class SoftCrossEntropyLoss(nn.Module):
+
+    def __init__(self, ignore_index=-1, eps=1e-7):
+        super().__init__()
+        self.ignore_index = ignore_index
+        self.eps = eps
+
+    def forward(self, pred, target):
+        mask = target != self.ignore_index
+        pred = F.log_softmax(pred)
+        loss = -pred * target
+        loss = loss * mask.float()
+        # print(loss, pred, target, mask)
+        return loss.sum() / (mask.sum() + self.eps)
 
 
 class FocalLoss(nn.Module):

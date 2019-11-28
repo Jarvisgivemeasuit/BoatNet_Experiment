@@ -142,7 +142,7 @@ class Boat_UNet_Part1(nn.Module):
         self.up3 = Up(128, 192, 64)
         self.up4 = Up(64, 128, 64, last_cat=True)
         self.up5 = Up(64, 68, 64)
-        self.outconv = nn.Conv2d(64, num_classes, 1)
+        self.outconv = Double_conv(64, 2)
 
         self.softmax = nn.Softmax(dim=1)
 
@@ -170,10 +170,9 @@ class Boat_UNet_Part1(nn.Module):
         x = self.up5(x, ori_x)
 
         fore_output = self.outconv(x)
-        
         fore_feature = self.softmax(fore_output)
         fore_feature = (fore_feature > (1 - rate)).float()
-        fore_feature = fore_feature[:, -1, :, :]
+        fore_feature = fore_feature[:,-1, :, :]
         fore_feature = fore_feature.reshape(fore_feature.shape[0], 1, fore_feature.shape[1], fore_feature.shape[2])
 
         output = torch.cat([x, fore_feature], dim=1)

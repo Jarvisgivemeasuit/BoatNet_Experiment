@@ -147,7 +147,7 @@ class Trainer:
             self.val_metric.miou.update(output, tar)
             self.val_metric.kappa.update(output, tar)
             
-            if idx % 10 == 0:
+            if idx % 5 == 0:
                 self.visualize_batch_image(img, tar, output, epoch, idx)
 
             batch_time.update(time.time() - starttime)

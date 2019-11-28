@@ -27,14 +27,13 @@ import numpy as np
 
 class Trainer:
     def __init__(self, Args):
-        self.num_classes = Rssrai.NUM_CLASSES
         self.args = Args
         self.start_epoch = 1
         self.epochs = self.args.epochs
         self.best_pred = 0
         self.best_miou = 0
 
-        train_set, val_set, self.num_classes = make_dataset(self.args.tr_batch_size, self.args.vd_batch_size)
+        train_set, val_set, self.num_classes = make_dataset()
         self.mean = train_set.mean
         self.std = train_set.std
         self.train_loader = DataLoader(train_set, batch_size=self.args.tr_batch_size,
@@ -42,8 +41,6 @@ class Trainer:
         self.val_loader = DataLoader(val_set, batch_size=self.args.vd_batch_size,
                                      shuffle=False, num_workers=self.args.num_workers)
 
-        # self.net_st = Boat_UNet_Part1(self.args.inplanes, 2, self.args.backbone1).cuda()
-        # self.net_nd = Boat_UNet_Part2(65, self.num_classes, self.args.backbone2).cuda()
         self.net = Boat_UNet(self.args.inplanes, self.num_classes, self.args.backbone1, self.args.backbone2).cuda()
         
         self.optimizer = torch.optim.Adam(self.net.parameters(), lr=self.args.lr, weight_decay=1e-5)
@@ -57,8 +54,9 @@ class Trainer:
         # self.net_nd = nn.DataParallel(self.net_nd, self.args.gpu_ids)
         self.net = nn.DataParallel(self.net, self.args.gpu_ids)
 
-        self.criterion0 = nn.MSELoss().cuda()
-        self.criterion1 = nn.CrossEntropyLoss().cuda()
+        self.criterion0 = SoftCrossEntropyLoss().cuda()
+        self.criterion1 = nn.CrossEntropyLoss(reduction='none').cuda()
+        self.criterion2 = nn.CrossEntropyLoss(reduction='none').cuda()
         self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, mode='min', factor=0.3, patience=4)
 
         self.Metric = namedtuple('Metric', 'pixacc miou kappa')
@@ -94,12 +92,12 @@ class Trainer:
             pred_bmask, pred_rate, pred = self.net(img)
 
             loss1 = self.criterion0(pred_rate, rate)
-            loss2 = self.criterion1(pred_bmask, bmask.long())
-            loss3 = self.criterion1(pred, tar.long())
+            loss2 = self.criterion1(pred_bmask, bmask.long()).mean()
+            loss3 = self.criterion2(pred, tar.long()).mean()
+            # print(loss1.shape, loss2.shape, loss3.shape)
 
             loss = loss1 + loss2 + loss3
             losses.update(loss)
-            print(pred, tar)
 
             self.train_metric.pixacc.update(pred, tar)
             self.train_metric.miou.update(pred, tar)
@@ -115,18 +113,19 @@ class Trainer:
             batch_time.update(time.time() - starttime)
             starttime = time.time()
 
-            bar.suffix = '({batch}/{size})Batch:{bt:.2f}s, Total:{total:}, ETA:{eta:}, Loss:{loss1:.4f},{loss2:.4f},{loss3:.4f}, Acc:{Acc:.4f}, mIoU:{mIoU:.4f}, kappa:{kappa:.4f}'.format(
+            bar.suffix = '({batch}/{size})Batch:{bt:.2f}s, Total:{total:}, ETA:{eta:}, Loss:{loss1:.4f},{loss2:.4f},{loss3:.4f}, {loss:.4f}, Acc:{Acc:.4f}, mIoU:{mIoU:.4f}, kappa:{kappa:.4f}'.format(
                 batch=idx + 1,
-                size=len(self.val_loader),
+                size=num_train,
                 bt=batch_time.avg,
                 total=bar.elapsed_td,
                 eta=bar.eta_td,
                 loss1=loss1,
                 loss2=loss2,
                 loss3=loss3,
-                mIoU=self.val_metric.miou.get(),
-                Acc=self.val_metric.pixacc.get(),
-                kappa=self.val_metric.kappa.get()
+                loss=loss,
+                mIoU=self.train_metric.miou.get(),
+                Acc=self.train_metric.pixacc.get(),
+                kappa=self.train_metric.kappa.get()
             )
             bar.next()
         bar.finish()
@@ -157,31 +156,29 @@ class Trainer:
             if self.args.cuda:
                 img, tar, bmask, rate = img.cuda(), tar.cuda(), bmask.cuda(), rate.cuda()
 
-            self.optimizer.zero_grad()
-            output_bmask, output_rate, pred_st, down_list = self.net_st(img)
+            with torch.no_grad():
+                pred_bmask, pred_rate, pred = self.net(img)
 
-            loss1 = self.criterion0(output_rate, rate)
-            loss2 = self.criterion1(output_bmask, bmask.long())
-            
-            pred = self.net_nd(pred_st, down_list)
-            loss3 = self.criterion1(pred, tar.long())
-            
+            loss1 = self.criterion0(pred_rate, rate)
+            loss2 = self.criterion1(pred_bmask, bmask.long()).mean()
+            loss3 = self.criterion2(pred, tar.long()).mean()
+
             loss = loss1 + loss2 + loss3
-            losses.update(loss.item())
+            losses.update(loss)
 
             self.val_metric.pixacc.update(pred, tar)
             self.val_metric.miou.update(pred, tar)
             self.val_metric.kappa.update(pred, tar)
 
             
-            if idx % 10 == 0:
-                self.visualize_batch_image(img, bmask, output_bmask, epoch, idx, 1)
+            if idx % 5 == 0:
+                self.visualize_batch_image(img, bmask, pred_bmask, epoch, idx, 1)
                 self.visualize_batch_image(img, tar, pred, epoch, idx, 2)
 
             batch_time.update(time.time() - starttime)
             starttime = time.time()
 
-            bar.suffix = '({batch}/{size})Batch:{bt:.2f}s, Total:{total:}, ETA:{eta:}, Loss:{loss1:.4f},{loss2:.4f},{loss3:.4f}, Acc:{Acc:.4f}, mIoU:{mIoU:.4f}, kappa:{kappa:.4f}'.format(
+            bar.suffix = '({batch}/{size})Batch:{bt:.2f}s, Total:{total:}, ETA:{eta:}, Loss:{loss1:.4f},{loss2:.4f},{loss3:.4f}, {loss:.4f}, Acc:{Acc:.4f}, mIoU:{mIoU:.4f}, kappa:{kappa:.4f}'.format(
                 batch=idx + 1,
                 size=len(self.val_loader),
                 bt=batch_time.avg,
@@ -190,6 +187,7 @@ class Trainer:
                 loss1=loss1,
                 loss2=loss2,
                 loss3=loss3,
+                loss=loss,
                 mIoU=self.val_metric.miou.get(),
                 Acc=self.val_metric.pixacc.get(),
                 kappa=self.val_metric.kappa.get()
