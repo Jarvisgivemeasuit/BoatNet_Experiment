@@ -43,20 +43,17 @@ class Trainer:
 
         self.net = Boat_UNet(self.args.inplanes, self.num_classes, self.args.backbone1, self.args.backbone2).cuda()
         
-        self.optimizer = torch.optim.Adam(self.net.parameters(), lr=self.args.lr, weight_decay=1e-5)
+        self.optimizer = torch.optim.Adam(self.net.parameters(), lr=self.args.lr)
 
         if self.args.apex:
-            # self.net_st, self.optimizer = amp.initialize(self.net_st, self.optimizer, opt_level='O1')
-            # self.net_nd, self.optimizer = amp.initialize(self.net_nd, self.optimizer, opt_level='O1')
             self.net, self.optimizer = amp.initialize(self.net, self.optimizer, opt_level='O1')
-            
-        # self.net_st = nn.DataParallel(self.net_st, self.args.gpu_ids)
-        # self.net_nd = nn.DataParallel(self.net_nd, self.args.gpu_ids)
         self.net = nn.DataParallel(self.net, self.args.gpu_ids)
 
         self.criterion0 = SoftCrossEntropyLoss().cuda()
+        # self.criterion1 = FocalLoss(self.num_classes).cuda()
+        # self.criterion2 = FocalLoss(self.num_classes).cuda()
         self.criterion1 = nn.CrossEntropyLoss(reduction='none').cuda()
-        self.criterion2 = nn.CrossEntropyLoss(reduction='none').cuda()
+        self.criterion2 = nn.CrossEntropyLoss(reduction='none', ignore_index=16).cuda()
         self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, mode='min', factor=0.3, patience=4)
 
         self.Metric = namedtuple('Metric', 'pixacc miou kappa')
@@ -75,6 +72,9 @@ class Trainer:
         self.train_metric.pixacc.reset()
 
         batch_time = AverageMeter()
+        losses1 = AverageMeter()
+        losses2 = AverageMeter()
+        losses3 = AverageMeter()
         losses = AverageMeter()
         starttime = time.time()
 
@@ -94,9 +94,11 @@ class Trainer:
             loss1 = self.criterion0(pred_rate, rate)
             loss2 = self.criterion1(pred_bmask, bmask.long()).mean()
             loss3 = self.criterion2(pred, tar.long()).mean()
-            # print(loss1.shape, loss2.shape, loss3.shape)
 
             loss = loss1 + loss2 + loss3
+            losses1.update(loss1)
+            losses2.update(loss2)
+            losses3.update(loss3)
             losses.update(loss)
 
             self.train_metric.pixacc.update(pred, tar)
@@ -119,10 +121,10 @@ class Trainer:
                 bt=batch_time.avg,
                 total=bar.elapsed_td,
                 eta=bar.eta_td,
-                loss1=loss1,
-                loss2=loss2,
-                loss3=loss3,
-                loss=loss,
+                loss1=losses1.avg,
+                loss2=losses2.avg,
+                loss3=losses3.avg,
+                loss=losses.avg,
                 mIoU=self.train_metric.miou.get(),
                 Acc=self.train_metric.pixacc.get(),
                 kappa=self.train_metric.kappa.get()
@@ -143,6 +145,9 @@ class Trainer:
         self.val_metric.pixacc.reset()
 
         batch_time = AverageMeter()
+        losses1 = AverageMeter()
+        losses2 = AverageMeter()
+        losses3 = AverageMeter()
         losses = AverageMeter()
         starttime = time.time()
 
@@ -164,6 +169,9 @@ class Trainer:
             loss3 = self.criterion2(pred, tar.long()).mean()
 
             loss = loss1 + loss2 + loss3
+            losses1.update(loss1)
+            losses2.update(loss2)
+            losses3.update(loss3)
             losses.update(loss)
 
             self.val_metric.pixacc.update(pred, tar)
@@ -184,10 +192,10 @@ class Trainer:
                 bt=batch_time.avg,
                 total=bar.elapsed_td,
                 eta=bar.eta_td,
-                loss1=loss1,
-                loss2=loss2,
-                loss3=loss3,
-                loss=loss,
+                loss1=losses1.avg,
+                loss2=losses2.avg,
+                loss3=losses3.avg,
+                loss=losses.avg,
                 mIoU=self.val_metric.miou.get(),
                 Acc=self.val_metric.pixacc.get(),
                 kappa=self.val_metric.kappa.get()
