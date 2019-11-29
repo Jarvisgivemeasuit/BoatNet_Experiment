@@ -30,14 +30,14 @@ class Rssrai(Dataset):
         if self._mode == 'train':
             self._image_dir = os.path.join(self._base_dir, 'train_split_256', 'img')
             self._label_dir = os.path.join(self._base_dir, 'train_split_256', 'mask')
-            self._rate_dir = os.path.join(self._base_dir, 'train_split_256', 'binary_mask')
+            self._ratios_dir = os.path.join(self._base_dir, 'train_split_256', 'binary_mask')
             self._data_list = os.listdir(self._image_dir)
             self.len = len(self._data_list)
 
         if self._mode == 'val':
             self._image_dir = os.path.join(self._base_dir, 'val_split_256', 'img')
             self._label_dir = os.path.join(self._base_dir, 'val_split_256', 'mask')
-            self._rate_dir = os.path.join(self._base_dir, 'val_split_256', 'binary_mask')
+            self._ratios_dir = os.path.join(self._base_dir, 'val_split_256', 'binary_mask')
             self._data_list = os.listdir(self._image_dir)
             self.len = len(self._data_list)
 
@@ -62,8 +62,8 @@ class Rssrai(Dataset):
     def load_numpy(self, idx, mode):
         image = np.load(os.path.join(self._image_dir, self._data_list[idx]))
         mask = np.load(os.path.join(self._label_dir, self._data_list[idx]))
-        binary_dict = np.load(os.path.join(self._rate_dir, self._data_list[idx]), allow_pickle=True).item()
-        binary_mask, rate = binary_dict['binary_mask'], binary_dict['rate']
+        binary_dict = np.load(os.path.join(self._ratios_dir, self._data_list[idx]), allow_pickle=True).item()
+        binary_mask, ratios = binary_dict['binary_mask'], binary_dict['ratios']
         
         sample = {'image': image, 'label': mask}
         if mode == 'train':
@@ -73,7 +73,7 @@ class Rssrai(Dataset):
             
         sample['image'] = sample['image'].transpose((2, 0, 1))
         sample['binary_mask'] = binary_mask
-        sample['rate'] = rate
+        sample['ratios'] = ratios
         return sample
 
     def load_img(self, idx):

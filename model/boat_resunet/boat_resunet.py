@@ -59,13 +59,16 @@ class ResDown(nn.Module):
 class Pred_Fore_Rate(nn.Module):
     def __init__(self, inplanes, planes):
         super().__init__()
-        self.conv1x1 = nn.Conv2d(inplanes, planes, 1)
-        self.pool = nn.AdaptiveAvgPool2d(1)
-        self.softmax = nn.Softmax(dim=1)
+        self.de_ratio = ChDecrease(512, 8)
+        self.fc1 = nn.Linear(64 * 16 * 16, 2048)
+        self.fc2 = nn.Linear(2048, planes)
+        self.softmax = nn.Softmax()
 
     def forward(self, x):
-        x = self.conv1x1(x)
-        x = self.pool(x)
+        x = self.de_ratio(x)
+        x = x.view(x.shape[0], -1)
+        x = self.fc1(x)
+        x = self.fc2(x)
         x = self.softmax(x)
 
         return x
@@ -130,6 +133,7 @@ class Boat_UNet_Part1(nn.Module):
         super().__init__()
         self.down = ResDown(in_channels=inplanes, backbone=backbone)
         self.backbone = backbone
+        self.num_classes = num_classes
 
         if self.backbone not in ['resnet18', 'resnet34']:
             self.de1 = ChDecrease(256, 4)
@@ -137,16 +141,16 @@ class Boat_UNet_Part1(nn.Module):
             self.de3 = ChDecrease(1024, 4)
             self.de4 = ChDecrease(2048, 4)
 
-        self.fore_pred = Pred_Fore_Rate(512, 1)
+        self.fore_pred = Pred_Fore_Rate(512, self.num_classes)
 
         self.up1 = Up(512, 768, 256)
         self.up2 = Up(256, 384, 128)
         self.up3 = Up(128, 192, 64)
         self.up4 = Up(64, 128, 64, last_cat=True)
         self.up5 = Up(64, 68, 64)
-        self.outconv = Double_conv(64, 2)
-
+        
         self.softmax = nn.Softmax(dim=1)
+        self.outconv = Double_conv(64, 2)
 
     def forward(self, x):
         ori_x = x
@@ -159,7 +163,7 @@ class Boat_UNet_Part1(nn.Module):
             x4 = self.de4(x4)
         # print(x0.shape, x1.shape, x2.shape, x3.shape, x4.shape)
 
-        rate = self.fore_pred(x4)
+        ratios = self.fore_pred(x4).float()
 
         x = self.up1(x4, x3)
         output0 = x
@@ -173,14 +177,13 @@ class Boat_UNet_Part1(nn.Module):
 
         fore_output = self.outconv(x)
         fore_feature = self.softmax(fore_output)
-        fore_feature = (fore_feature > (1 - rate)).float()
+        fore_feature = (fore_feature > (1 - ratios[:-1].sum())).float()
         fore_feature = fore_feature[:,-1, :, :]
         fore_feature = fore_feature.reshape(fore_feature.shape[0], 1, fore_feature.shape[1], fore_feature.shape[2])
 
         output = torch.cat([x, fore_feature], dim=1)
-        rate = rate.reshape(rate.shape[0])
 
-        return fore_output, rate, output, [ori_x, x0, x1, x2, x3, x4], [output3, output2, output1, output0]
+        return fore_output, ratios, output, [ori_x, x0, x1, x2, x3, x4], [output3, output2, output1, output0]
 
 
 class Boat_UNet_Part2(nn.Module):
@@ -201,11 +204,11 @@ class Boat_UNet_Part2(nn.Module):
             self.de4 = ChDecrease(2048, 4)
 
 
-        self.up1 = Up(512, 768, 256, bilinear=True)
-        self.up2 = Up(256, 384, 128, bilinear=True)
-        self.up3 = Up(128, 192, 64, bilinear=True)
-        self.up4 = Up(64, 128, 64, bilinear=True, last_cat=True)
-        self.up5 = Up(64, 133, 64, bilinear=True)
+        self.up1 = Up(512, 768, 256)
+        self.up2 = Up(256, 384, 128)
+        self.up3 = Up(128, 192, 64)
+        self.up4 = Up(64, 128, 64)
+        self.up5 = Up(64, 133, 64, last_cat=True)
         self.outconv = nn.Conv2d(64, num_classes, 1)
 
     def forward(self, x, down_list, up_list):
@@ -247,14 +250,14 @@ class Boat_UNet_Part2(nn.Module):
 class Boat_UNet(nn.Module):
     def __init__(self, inplanes, num_classes, backbone1, backbone2):
         super().__init__()
-        self.part1 = Boat_UNet_Part1(inplanes, 1, backbone1)
+        self.part1 = Boat_UNet_Part1(inplanes, num_classes, backbone1)
         self.part2 = Boat_UNet_Part2(65, num_classes, backbone2)
 
     def forward(self, x):
-        output_bmask, output_rate, x, down_list, up_list = self.part1(x)
+        output_bmask, output_ratios, x, down_list, up_list = self.part1(x)
         output = self.part2(x, down_list, up_list)
 
-        return output_bmask, output_rate, output
+        return output_bmask, output_ratios, output
 
 
 # net = Boat_UNet_Part1(4, 1, 'resnet50')

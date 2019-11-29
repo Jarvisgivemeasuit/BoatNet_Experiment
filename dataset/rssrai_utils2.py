@@ -61,6 +61,7 @@ mask_colormap = np.array([[0, 200, 0],
 
 mean = (0.52891074, 0.38070734, 0.40119018, 0.36884733)
 std = (0.24007008, 0.23784, 0.22267079, 0.21865861)
+NUM_CLASSES = 16
 
 
 class Path:
@@ -339,6 +340,29 @@ def fore_back(path_dict):
     bar.finish()
 
 
+def fore_back_ratios(path_dict):
+    img_list = os.listdir(path_dict['data_path'])
+    num_imgs = len(img_list)
+    bar = Bar('Saving binary file:', max=num_imgs)
+
+    for i, mask_file in enumerate(img_list):
+        mask = np.load(os.path.join(path_dict['data_path'], mask_file))
+
+        back = (mask == 15).sum()
+        ratios = np.zeros(NUM_CLASSES)
+        for category in range(NUM_CLASSES):
+            ratios[category] = (mask == category).sum() / mask.size
+
+        binary = np.ones(mask.shape)
+        binary[np.where(mask == 15)] = 0
+
+        np.save(os.path.join(path_dict['save_path'], mask_file), {'binary_mask': binary, 'ratios': ratios})
+        
+        bar.suffix = f'{i + 1} / {num_imgs}'
+        bar.next()
+    bar.finish()
+
+
 #  计算所有图片像素的均值并调用std
 def mean_std(path):
     img_list = os.listdir(path)
@@ -382,22 +406,22 @@ if __name__ == '__main__':
     paths_obj = ProcessingPath()
     paths_dict = paths_obj.get_paths_dict(mode='all')
 
-    spliter_paths = {}
-    spliter_paths['data_path'] = paths_dict['test_path']
-    spliter_paths['save_path'] = paths_dict['test_split_256']
-    spliter_paths['img_format'] = '.tif'
+    # spliter_paths = {}
+    # spliter_paths['data_path'] = paths_dict['test_path']
+    # spliter_paths['save_path'] = paths_dict['test_split_256']
+    # spliter_paths['img_format'] = '.tif'
 
-    # spliter = ImageSpliter(spliter_paths)
-    spliter = TestImageSpliter(spliter_paths)
-    spliter.split_image()
+    # # spliter = ImageSpliter(spliter_paths)
+    # spliter = TestImageSpliter(spliter_paths)
+    # spliter.split_image()
 
 
-    # division_paths = {}
-    # division_paths['source_path'] = paths_dict['data_split_256']
-    # division_paths['tr_save_path'] = paths_dict['train_split_256']
-    # division_paths['vd_save_path'] = paths_dict['val_split_256']
+    division_paths = {}
+    division_paths['source_path'] = paths_dict['data_split_256']
+    division_paths['tr_save_path'] = paths_dict['train_split_256']
+    division_paths['vd_save_path'] = paths_dict['val_split_256']
 
-    # train_valid(division_paths)
+    train_valid(division_paths)
 
 
     # transpose_paths = {}
@@ -411,4 +435,4 @@ if __name__ == '__main__':
     # binary_paths['data_path'] = os.path.join(paths_dict['data_split_256'], 'mask')
     # binary_paths['save_path'] = os.path.join(paths_dict['data_split_256'], 'binary_mask')
     
-    # fore_back(binary_paths)
+    # fore_back_ratios(binary_paths)

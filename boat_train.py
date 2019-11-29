@@ -43,20 +43,20 @@ class Trainer:
 
         self.net = Boat_UNet(self.args.inplanes, self.num_classes, self.args.backbone1, self.args.backbone2).cuda()
         
-        self.optimizer = torch.optim.Adam(self.net.parameters(), lr=self.args.lr)
+        self.optimizer = torch.optim.SGD(self.net.parameters(), lr=self.args.lr)
 
         if self.args.apex:
             self.net, self.optimizer = amp.initialize(self.net, self.optimizer, opt_level='O1')
         self.net = nn.DataParallel(self.net, self.args.gpu_ids)
 
         self.criterion0 = SoftCrossEntropyLoss().cuda()
-        # self.criterion1 = FocalLoss().cuda()
-        # self.criterion2 = FocalLoss().cuda()
+        self.criterion1 = FocalLoss(alpha=10).cuda()
+        self.criterion2 = FocalLoss().cuda()
         
         # self.criterion0 = nn.MSELoss().cuda()
-        self.criterion1 = nn.CrossEntropyLoss().cuda()
-        self.criterion2 = nn.CrossEntropyLoss(ignore_index=16).cuda()
-        self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, mode='min', factor=0.3, patience=4)
+        # self.criterion1 = nn.CrossEntropyLoss().cuda()
+        # self.criterion2 = nn.CrossEntropyLoss(ignore_index=16).cuda()
+        self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, mode='min', factor=0.1, patience=4)
 
         self.Metric = namedtuple('Metric', 'pixacc miou kappa')
         self.train_metric = self.Metric(pixacc=metrics.PixelAccuracy(),
@@ -86,14 +86,14 @@ class Trainer:
         self.net.train()
 
         for idx, sample in enumerate(self.train_loader):
-            img, tar, bmask, rate = sample['image'], sample['label'], sample['binary_mask'], sample['rate']
+            img, tar, bmask, ratios = sample['image'], sample['label'], sample['binary_mask'], sample['ratios']
             if self.args.cuda:
-                img, tar, bmask, rate = img.cuda(), tar.cuda(), bmask.cuda(), rate.cuda()
+                img, tar, bmask, ratios = img.cuda(), tar.cuda(), bmask.cuda(), ratios.cuda()
 
             self.optimizer.zero_grad()
-            pred_bmask, pred_rate, pred = self.net(img)
+            pred_bmask, pred_ratios, pred = self.net(img)
 
-            loss1 = self.criterion0(pred_rate, rate)
+            loss1 = self.criterion0(pred_ratios, ratios.float())
             loss2 = self.criterion1(pred_bmask, bmask.long())
             loss3 = self.criterion2(pred, tar.long())
 
@@ -159,14 +159,14 @@ class Trainer:
         self.net.eval()
 
         for idx, sample in enumerate(self.val_loader):
-            img, tar, bmask, rate = sample['image'], sample['label'], sample['binary_mask'], sample['rate']
+            img, tar, bmask, ratios = sample['image'], sample['label'], sample['binary_mask'], sample['ratios']
             if self.args.cuda:
-                img, tar, bmask, rate = img.cuda(), tar.cuda(), bmask.cuda(), rate.cuda()
+                img, tar, bmask, ratios = img.cuda(), tar.cuda(), bmask.cuda(), ratios.cuda()
 
             with torch.no_grad():
-                pred_bmask, pred_rate, pred = self.net(img)
+                pred_bmask, pred_ratios, pred = self.net(img)
 
-            loss1 = self.criterion0(pred_rate, rate)
+            loss1 = self.criterion0(pred_ratios, ratios)
             loss2 = self.criterion1(pred_bmask, bmask.long()).mean()
             loss3 = self.criterion2(pred, tar.long()).mean()
 
