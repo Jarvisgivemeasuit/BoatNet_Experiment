@@ -349,9 +349,10 @@ def fore_back_ratios(path_dict):
         mask = np.load(os.path.join(path_dict['data_path'], mask_file))
 
         back = (mask == 15).sum()
-        ratios = np.zeros(NUM_CLASSES)
+        ratios = np.zeros([NUM_CLASSES, 2])
         for category in range(NUM_CLASSES):
-            ratios[category] = (mask == category).sum() / mask.size
+            ratios[category, 0] = (mask == category).sum() / mask.size
+            ratios[category, 1] = 1 - ratios[category, 0]
 
         binary = np.ones(mask.shape)
         binary[np.where(mask == 15)] = 0

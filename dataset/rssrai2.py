@@ -73,7 +73,7 @@ class Rssrai(Dataset):
             
         sample['image'] = sample['image'].transpose((2, 0, 1))
         sample['binary_mask'] = binary_mask
-        sample['ratios'] = ratios
+        sample['ratios'] = ratios.transpose((1, 0))
         return sample
 
     def load_img(self, idx):

@@ -59,17 +59,21 @@ class ResDown(nn.Module):
 class Pred_Fore_Rate(nn.Module):
     def __init__(self, inplanes, planes):
         super().__init__()
-        self.de_ratio = ChDecrease(512, 8)
-        self.fc1 = nn.Linear(64 * 16 * 16, 2048)
-        self.fc2 = nn.Linear(2048, planes)
-        self.softmax = nn.Softmax()
+        self.de_ratio = ChDecrease(512, 256)
+        self.pool = nn.AdaptiveAvgPool2d((16, 1))
+        
+        # self.fc1 = nn.Linear(64 * 16 * 16, 2048)
+        # self.fc2 = nn.Linear(2048, planes)
+        self.softmax = nn.Softmax(dim=-1)
 
     def forward(self, x):
         x = self.de_ratio(x)
-        x = x.view(x.shape[0], -1)
-        x = self.fc1(x)
-        x = self.fc2(x)
+        x = self.pool(x)
+        # x = x.view(x.shape[0], -1)
+        # x = self.fc1(x)
+        # x = self.fc2(x)
         x = self.softmax(x)
+        x = x.reshape(x.shape[:-1])
 
         return x
 
