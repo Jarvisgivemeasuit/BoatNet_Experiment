@@ -73,7 +73,9 @@ class Rssrai(Dataset):
             
         sample['image'] = sample['image'].transpose((2, 0, 1))
         sample['binary_mask'] = binary_mask
-        sample['ratios'] = ratios.transpose((1, 0))
+        sample['ratios'] = np.array([ratios[:-1, 0].sum(), 1 - ratios[:-1, 0].sum()])
+        # sample['ratios'] = ratios.transpose((1, 0))
+        # print(sample['ratios'])
         return sample
 
     def load_img(self, idx):

@@ -92,7 +92,6 @@ class Trainer:
 
             self.optimizer.zero_grad()
             pred_bmask, pred_ratios, pred = self.net(img)
-
             loss1 = self.criterion0(pred_ratios, ratios.float())
             loss2 = self.criterion1(pred_bmask, bmask.long())
             loss3 = self.criterion2(pred, tar.long())

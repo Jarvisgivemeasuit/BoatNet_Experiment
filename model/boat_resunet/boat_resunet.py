@@ -60,20 +60,22 @@ class Pred_Fore_Rate(nn.Module):
     def __init__(self, inplanes, planes):
         super().__init__()
         self.de_ratio = ChDecrease(512, 256)
-        self.pool = nn.AdaptiveAvgPool2d((16, 1))
-        
+        self.pool = nn.AdaptiveAvgPool2d(1)
         # self.fc1 = nn.Linear(64 * 16 * 16, 2048)
         # self.fc2 = nn.Linear(2048, planes)
-        self.softmax = nn.Softmax(dim=-1)
+        # self.softmax = nn.Softmax(dim=-1)
 
     def forward(self, x):
         x = self.de_ratio(x)
         x = self.pool(x)
+        x = x.reshape(x.shape[0], 2)
+        # x = x.reshape(x.shape[0], 2, -1)
         # x = x.view(x.shape[0], -1)
         # x = self.fc1(x)
         # x = self.fc2(x)
-        x = self.softmax(x)
-        x = x.reshape(x.shape[:-1])
+        # x = self.softmax(x)
+        # x = x.reshape(x.shape[:-1])
+        # x = x.reshape(x.shape[0], -1)
 
         return x
 
@@ -179,15 +181,19 @@ class Boat_UNet_Part1(nn.Module):
         output3 = x
         x = self.up5(x, ori_x)
 
-        fore_output = self.outconv(x)
-        fore_feature = self.softmax(fore_output)
-        fore_feature = (fore_feature > (1 - ratios[:-1].sum())).float()
-        fore_feature = fore_feature[:,-1, :, :]
-        fore_feature = fore_feature.reshape(fore_feature.shape[0], 1, fore_feature.shape[1], fore_feature.shape[2])
+        fg_output = self.outconv(x)
 
-        output = torch.cat([x, fore_feature], dim=1)
+        ratios_results = self.softmax(ratios)
+        fg_feature = self.softmax(fg_output)
 
-        return fore_output, ratios, output, [ori_x, x0, x1, x2, x3, x4], [output3, output2, output1, output0]
+        fg_mask = torch.zeros(fg_feature.shape[0], fg_feature.shape[2], fg_feature.shape[3]).cuda()
+        for i in range(ratios.shape[0]):
+            fg_mask[i] = (fg_feature[i] > (1 - ratios_results[i, 0])).float()[-1]
+        fg_mask = fg_mask.reshape(fg_mask.shape[0], 1, fg_mask.shape[1], fg_mask.shape[2])
+
+        output = torch.cat([x, fg_mask], dim=1)
+
+        return fg_output, ratios, output, [ori_x, x0, x1, x2, x3, x4], [output3, output2, output1, output0]
 
 
 class Boat_UNet_Part2(nn.Module):

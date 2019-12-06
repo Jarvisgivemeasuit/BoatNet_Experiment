@@ -271,7 +271,7 @@ class SoftCrossEntropyLoss(nn.Module):
 
     def forward(self, pred, target):
         mask = target != self.ignore_index
-        pred = F.log_softmax(pred, dim=0)
+        pred = F.log_softmax(pred, dim=-1)
         loss = -pred * target
         loss = loss * mask.float()
         # print(loss, pred, target, mask)

@@ -41,18 +41,19 @@ class Trainer:
         self.val_loader = DataLoader(val_set, batch_size=self.args.vd_batch_size,
                                      shuffle=False, num_workers=self.args.num_workers)
 
-        self.net = ResDown(self.args.backbone, self.args.inplanes).cuda()
-        self.conv = nn.Conv2d(2048, 64, 1).cuda()
-        self.f2 = nn.Linear(16384, 1).cuda()
-        self.sigmoid = nn.Sigmoid()
+        self.net = Boat_UNet_Part1(self.args.backbone, self.args.inplanes).cuda()
+        self.conv = nn.Conv2d(512, 2, 1).cuda()
+        self.pool = nn.AdaptiveAvgPool2d(1)
         
-        self.optimizer = torch.optim.Adam(self.net.parameters(), lr=self.args.lr)
+        self.optimizer = torch.optim.SGD(self.net.parameters(), lr=self.args.lr)
 
         if self.args.apex:
             self.net, self.optimizer = amp.initialize(self.net, self.optimizer, opt_level='O1')
         self.net = nn.DataParallel(self.net, self.args.gpu_ids)
 
         self.criterion0 = SoftCrossEntropyLoss().cuda()
+        # self.criterion0 = nn.MSELoss().cuda()
+        self.criterion1 = SoftCrossEntropyLoss().cuda()
         self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, mode='min', factor=0.1, patience=4)
 
         self.Metric = namedtuple('Metric', 'pixacc miou kappa')
@@ -76,20 +77,18 @@ class Trainer:
         self.net.train()
 
         for idx, sample in enumerate(self.train_loader):
-            img, tar, bmask, rate = sample['image'], sample['label'], sample['binary_mask'], sample['rate']
+            img, tar, bmask, rate = sample['image'], sample['label'], sample['binary_mask'], sample['ratios']
             if self.args.cuda:
                 img, tar, bmask, rate = img.cuda(), tar.cuda(), bmask.cuda(), rate.cuda()
 
             self.optimizer.zero_grad()
             pred_rate = self.net(img)[-1]
             pred_rate = self.conv(pred_rate)
-            pred_rate = pred_rate.view(pred_rate.shape[0], -1)
-            pred_rate = self.f2(pred_rate)
-            pred_rate = self.sigmoid(pred_rate)
-            pred_rate = pred_rate.view(pred_rate.shape[0])
-            # print(pred_rate[0], rate[0])
+            pred_rate = self.pool(pred_rate)
+            pred_rate = pred_rate.reshape(pred_rate.shape[0], 2)
 
-            loss = self.criterion0(pred_rate, rate)
+            loss = self.criterion0(pred_rate, rate.float())
+            # loss = abs((pred_rate - rate.float())).sum() / self.args.tr_batch_size
 
             losses.update(loss)
 
@@ -102,7 +101,7 @@ class Trainer:
 
             batch_time.update(time.time() - starttime)
             starttime = time.time()
-            
+
             bar.suffix = '({batch}/{size}) Batch: {bt:.2f}s, Total:{total:}, ETA:{eta:}, Loss:{loss1:.4f}'.format(
                 batch=idx + 1,
                 size=num_train,
@@ -111,51 +110,56 @@ class Trainer:
                 eta=bar.eta_td,
                 loss1=losses.avg,
             )
+            
+            if idx == 440:
+                print(pred_rate[0].tolist(), rate[0].tolist())
+
             bar.next()
         bar.finish()
+
         print('[Epoch: %d, numImages: %5d]' % (epoch, num_train * self.args.tr_batch_size))
         print('Train Loss: %.3f' % losses.avg)
 
-    def validation(self, epoch):
+    # def validation(self, epoch):
 
-        batch_time = AverageMeter()
-        losses = AverageMeter()
-        starttime = time.time()
+    #     batch_time = AverageMeter()
+    #     losses = AverageMeter()
+    #     starttime = time.time()
 
-        num_val = len(self.val_loader)
-        bar = Bar('Validation', max=num_val)
+    #     num_val = len(self.val_loader)
+    #     bar = Bar('Validation', max=num_val)
 
-        self.net.eval()
+    #     self.net.eval()
 
-        for idx, sample in enumerate(self.val_loader):
-            img, tar, bmask, rate = sample['image'], sample['label'], sample['binary_mask'], sample['rate']
-            if self.args.cuda:
-                img, tar, bmask, rate = img.cuda(), tar.cuda(), bmask.cuda(), rate.cuda()
+    #     for idx, sample in enumerate(self.val_loader):
+    #         img, tar, bmask, rate = sample['image'], sample['label'], sample['binary_mask'], sample['rate']
+    #         if self.args.cuda:
+    #             img, tar, bmask, rate = img.cuda(), tar.cuda(), bmask.cuda(), rate.cuda()
 
-            with torch.no_grad():
-                pred_bmask, pred_rate, pred = self.net(img)
+    #         with torch.no_grad():
+    #             pred_bmask, pred_rate, pred = self.net(img)
 
-            loss = self.criterion0(pred_rate, rate)
-            losses.update(loss)
+    #         loss = self.criterion0(pred_rate, rate)
+    #         losses.update(loss)
 
-            batch_time.update(time.time() - starttime)
-            starttime = time.time()
+    #         batch_time.update(time.time() - starttime)
+    #         starttime = time.time()
 
-            bar.suffix = '({batch}/{size})Batch:{bt:.2f}s, Total:{total:}, ETA:{eta:}, Loss:{loss:.4f}'.format(
-                batch=idx + 1,
-                size=len(self.val_loader),
-                bt=batch_time.avg,
-                total=bar.elapsed_td,
-                eta=bar.eta_td,
-                loss=losses.avg,
-            )
-            bar.next()
-        bar.finish()
+    #         bar.suffix = '({batch}/{size})Batch:{bt:.2f}s, Total:{total:}, ETA:{eta:}, Loss:{loss:.4f}'.format(
+    #             batch=idx + 1,
+    #             size=len(self.val_loader),
+    #             bt=batch_time.avg,
+    #             total=bar.elapsed_td,
+    #             eta=bar.eta_td,
+    #             loss=losses.avg,
+    #         )
+    #         bar.next()
+    #     bar.finish()
 
-        print(f"[Epoch: {epoch}, numImages: {num_val * self.args.vd_batch_size}]")
-        print(f'Valid Loss: {losses.avg:.4f}')
+    #     print(f"[Epoch: {epoch}, numImages: {num_val * self.args.vd_batch_size}]")
+    #     print(f'Valid Loss: {losses.avg:.4f}')
 
-        return new_pred
+    #     return new_pred
 
 
 def train():
@@ -167,9 +171,9 @@ def train():
     print('Starting Epoch:', trainer.start_epoch)
     for epoch in range(trainer.start_epoch, trainer.epochs):
         trainer.training(epoch)
-        if not args.no_val:
-            new_pred = trainer.validation(epoch)
-            trainer.scheduler.step(new_pred)
+        # if not args.no_val:
+        #     new_pred = trainer.validation(epoch)
+        #     trainer.scheduler.step(new_pred)
             # trainer.auto_reset_learning_rate()
 
 

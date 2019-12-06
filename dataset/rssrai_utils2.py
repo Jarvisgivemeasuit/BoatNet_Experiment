@@ -353,6 +353,7 @@ def fore_back_ratios(path_dict):
         for category in range(NUM_CLASSES):
             ratios[category, 0] = (mask == category).sum() / mask.size
             ratios[category, 1] = 1 - ratios[category, 0]
+            # print(ratios[category])
 
         binary = np.ones(mask.shape)
         binary[np.where(mask == 15)] = 0
@@ -417,12 +418,12 @@ if __name__ == '__main__':
     # spliter.split_image()
 
 
-    division_paths = {}
-    division_paths['source_path'] = paths_dict['data_split_256']
-    division_paths['tr_save_path'] = paths_dict['train_split_256']
-    division_paths['vd_save_path'] = paths_dict['val_split_256']
+    # division_paths = {}
+    # division_paths['source_path'] = paths_dict['data_split_256']
+    # division_paths['tr_save_path'] = paths_dict['train_split_256']
+    # division_paths['vd_save_path'] = paths_dict['val_split_256']
 
-    train_valid(division_paths)
+    # train_valid(division_paths)
 
 
     # transpose_paths = {}
@@ -432,8 +433,8 @@ if __name__ == '__main__':
     # save_label_map(transpose_paths)
 
 
-    # binary_paths = {}
-    # binary_paths['data_path'] = os.path.join(paths_dict['data_split_256'], 'mask')
-    # binary_paths['save_path'] = os.path.join(paths_dict['data_split_256'], 'binary_mask')
+    binary_paths = {}
+    binary_paths['data_path'] = os.path.join(paths_dict['data_split_256'], 'mask')
+    binary_paths['save_path'] = os.path.join(paths_dict['data_split_256'], 'binary_mask')
     
-    # fore_back_ratios(binary_paths)
+    fore_back_ratios(binary_paths)
