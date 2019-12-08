@@ -290,16 +290,16 @@ class FocalLoss(nn.Module):
         N = pred.shape[0]
         C = pred.shape[1]
         num_pixels = pred.shape[2] * pred.shape[3]
-        
+
         target_index = target.view(target.shape[0], target.shape[1], target.shape[2], 1)
         class_mask = torch.zeros([N, pred.shape[2], pred.shape[3], C]).cuda()
         class_mask = class_mask.scatter_(3, target_index, 1.)
         class_mask = class_mask.transpose(1, 3)
         class_mask = class_mask.view(pred.shape)
-        
-        logsoft_pred = F.log_softmax(pred)
-        soft_pred = F.softmax(pred)
-        
+
+        logsoft_pred = F.log_softmax(pred, dim=1)
+        soft_pred = F.softmax(pred, dim=1)
+
         loss = -self.alpha * ((1 - soft_pred)) ** self.gamma * logsoft_pred
         loss = loss * class_mask
         loss = loss.sum(1)

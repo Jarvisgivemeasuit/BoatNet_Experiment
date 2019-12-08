@@ -43,15 +43,15 @@ class Trainer:
 
         self.net = Boat_UNet(self.args.inplanes, self.num_classes, self.args.backbone1, self.args.backbone2).cuda()
         
-        self.optimizer = torch.optim.SGD(self.net.parameters(), lr=self.args.lr)
+        self.optimizer = torch.optim.Adam(self.net.parameters(), lr=self.args.lr)
 
         if self.args.apex:
             self.net, self.optimizer = amp.initialize(self.net, self.optimizer, opt_level='O1')
         self.net = nn.DataParallel(self.net, self.args.gpu_ids)
 
         self.criterion0 = SoftCrossEntropyLoss().cuda()
-        self.criterion1 = FocalLoss(alpha=10).cuda()
-        self.criterion2 = FocalLoss().cuda()
+        self.criterion1 = FocalLoss().cuda()
+        self.criterion2 = FocalLoss(alpha=0.07).cuda()
         
         # self.criterion0 = nn.MSELoss().cuda()
         # self.criterion1 = nn.CrossEntropyLoss().cuda()

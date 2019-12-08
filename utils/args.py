@@ -11,11 +11,11 @@ class Args:
         self.model_name = 'resunet'
         self.backbone = 'resnet34'
         self.backbone1 = 'resnet50'
-        self.backbone2 = 'resnet18'
+        self.backbone2 = 'resnet34'
         self.annotations = 'deconv-deconv'
 
         self.epochs = 100
-        self.lr = 0.3
+        self.lr = 0.003
         self.no_val = False
 
         self.gpu_ids = [0, 1]

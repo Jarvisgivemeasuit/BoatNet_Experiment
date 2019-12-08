@@ -183,17 +183,18 @@ class Boat_UNet_Part1(nn.Module):
 
         fg_output = self.outconv(x)
 
-        ratios_results = self.softmax(ratios)
-        fg_feature = self.softmax(fg_output)
+        # ratios_results = self.softmax(ratios)
+        # fg_feature = self.softmax(fg_output)
 
-        fg_mask = torch.zeros(fg_feature.shape[0], fg_feature.shape[2], fg_feature.shape[3]).cuda()
-        for i in range(ratios.shape[0]):
-            fg_mask[i] = (fg_feature[i] > (1 - ratios_results[i, 0])).float()[-1]
-        fg_mask = fg_mask.reshape(fg_mask.shape[0], 1, fg_mask.shape[1], fg_mask.shape[2])
+        # fg_mask = torch.zeros(fg_feature.shape[0], fg_feature.shape[2], fg_feature.shape[3]).cuda()
+        # for i in range(ratios.shape[0]):
+        #     fg_mask[i] = (fg_feature[i] > (1 - ratios_results[i, 0])).float()[-1]
+        # fg_mask = fg_mask.reshape(fg_mask.shape[0], 1, fg_mask.shape[1], fg_mask.shape[2])
 
-        output = torch.cat([x, fg_mask], dim=1)
+        # output = torch.cat([x, fg_mask], dim=1)
 
-        return fg_output, ratios, output, [ori_x, x0, x1, x2, x3, x4], [output3, output2, output1, output0]
+        # return fg_output, ratios, output, [ori_x, x0, x1, x2, x3, x4], [output3, output2, output1, output0]
+        return fg_output
 
 
 class Boat_UNet_Part2(nn.Module):
@@ -264,10 +265,10 @@ class Boat_UNet(nn.Module):
         self.part2 = Boat_UNet_Part2(65, num_classes, backbone2)
 
     def forward(self, x):
-        output_bmask, output_ratios, x, down_list, up_list = self.part1(x)
+        fg_mask, output_ratios, x, down_list, up_list = self.part1(x)
         output = self.part2(x, down_list, up_list)
 
-        return output_bmask, output_ratios, output
+        return fg_mask, output_ratios, output
 
 
 # net = Boat_UNet_Part1(4, 1, 'resnet50')

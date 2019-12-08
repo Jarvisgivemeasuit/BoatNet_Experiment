@@ -17,7 +17,7 @@ def save_model(model, model_name, backbone1, backbone2=None, annotations=None):
         torch.save(model1, os.path.join(save_path, "{}-{}-{}bast_pred.pth"
                                         .format(backbone1, model_name, annotations)))
     else:
-        torch.save(model, os.path.join(save_path, "{}-{}-{}-{}bast_pred.pth"
+        torch.save(model, os.path.join(save_path, "{}-{}-{}-{}_bast_pred.pth"
                                        .format(model_name, backbone1, backbone2, annotations)))
 
     print('saved model successful.')
