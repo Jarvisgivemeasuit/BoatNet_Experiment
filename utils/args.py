@@ -14,8 +14,8 @@ class Args:
         self.backbone2 = 'resnet34'
         self.annotations = 'deconv-deconv'
 
-        self.epochs = 200
-        self.lr = 0.07
+        self.epochs = 150
+        self.lr = 0.05
         self.no_val = False
 
         self.gpu_ids = [0, 1]

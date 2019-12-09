@@ -40,8 +40,8 @@ class Trainer:
         self.val_loader = DataLoader(val_set, batch_size=self.args.vd_batch_size,
                                      shuffle=False, num_workers=self.args.num_workers)
 
-        self.net = get_model(self.args.model_name, self.args.backbone, self.args.inplanes, 2).cuda()
-        # self.net = get_model(self.args.model_name, self.args.backbone, self.args.inplanes, self.num_classes).cuda()
+        # self.net = get_model(self.args.model_name, self.args.backbone, self.args.inplanes, 2).cuda()
+        self.net = get_model(self.args.model_name, self.args.backbone, self.args.inplanes, self.num_classes).cuda()
         
         # self.net = torch.load('/home/arron/Documents/grey/paper/model_saving/resnet50-resunet-bast_pred.pth')
         
@@ -53,25 +53,25 @@ class Trainer:
 
         # self.criterion = torch.nn.CrossEntropyLoss(ignore_index=255).cuda()
         self.criterion = FocalLoss().cuda()
-        # self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, [20, 40, 60], 0.3)
-        self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, mode='min', factor=0.3, patience=3)
+        self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, [20, 40, 60, 100], 0.3)
+        # self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, mode='min', factor=0.3, patience=3)
         
         self.Metric = namedtuple('Metric', 'pixacc miou kappa')
 
-        # self.train_metric = self.Metric(pixacc=metrics.PixelAccuracy(),
-        #                                 miou=metrics.MeanIoU(self.num_classes),
-        #                                 kappa=metrics.Kappa(self.num_classes))
-
-        # self.val_metric = self.Metric(pixacc=metrics.PixelAccuracy(),
-        #                                 miou=metrics.MeanIoU(self.num_classes),
-        #                                 kappa=metrics.Kappa(self.num_classes))
         self.train_metric = self.Metric(pixacc=metrics.PixelAccuracy(),
-                                        miou=metrics.MeanIoU(2),
-                                        kappa=metrics.Kappa(2))
+                                        miou=metrics.MeanIoU(self.num_classes),
+                                        kappa=metrics.Kappa(self.num_classes))
 
         self.val_metric = self.Metric(pixacc=metrics.PixelAccuracy(),
-                                        miou=metrics.MeanIoU(2),
-                                        kappa=metrics.Kappa(2))
+                                        miou=metrics.MeanIoU(self.num_classes),
+                                        kappa=metrics.Kappa(self.num_classes))
+        # self.train_metric = self.Metric(pixacc=metrics.PixelAccuracy(),
+        #                                 miou=metrics.MeanIoU(2),
+        #                                 kappa=metrics.Kappa(2))
+
+        # self.val_metric = self.Metric(pixacc=metrics.PixelAccuracy(),
+        #                                 miou=metrics.MeanIoU(2),
+        #                                 kappa=metrics.Kappa(2))
 
     def training(self, epoch):
 
@@ -89,8 +89,8 @@ class Trainer:
         self.net.train()
 
         for idx, sample in enumerate(self.train_loader):
-            # img, tar = sample['image'], sample['label']
-            img, tar = sample['image'], sample['binary_mask']
+            img, tar = sample['image'], sample['label']
+            # img, tar = sample['image'], sample['binary_mask']
             
             if self.args.cuda:
                 img, tar = img.cuda(), tar.cuda()
@@ -150,8 +150,8 @@ class Trainer:
         self.net.eval()
 
         for idx, sample in enumerate(self.val_loader):
-            # img, tar = sample['image'], sample['label']
-            img, tar = sample['image'], sample['binary_mask']
+            img, tar = sample['image'], sample['label']
+            # img, tar = sample['image'], sample['binary_mask']
             if self.args.cuda:
                 img, tar = img.cuda(), tar.cuda()
             with torch.no_grad():
