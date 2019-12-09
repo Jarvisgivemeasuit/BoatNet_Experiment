@@ -50,8 +50,8 @@ class Trainer:
             self.net, self.optimizer = amp.initialize(self.net, self.optimizer, opt_level='O1')
         self.net = nn.DataParallel(self.net, self.args.gpu_ids)
 
-        # self.criterion1 = FocalLoss().cuda()
-        self.criterion1 = nn.CrossEntropyLoss().cuda()
+        # self.criterion = FocalLoss().cuda()
+        self.criterion = nn.CrossEntropyLoss().cuda()
 
         self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, mode='min', factor=0.1, patience=4)
 
@@ -87,9 +87,9 @@ class Trainer:
             # fg_mask, pred_rate = self.net(img)[:2]
             fg_mask = self.net(img)
             # print(fg_mask.shape, bmask.shape)
-            loss = self.criterion1(fg_mask, tar.long())
+            loss = self.criterion(fg_mask, tar.long())
 
-            losses.update(loss)
+            losses.update(loss.item())
 
             self.train_metric.pixacc.update(fg_mask, bmask)
             self.train_metric.miou.update(fg_mask, bmask)

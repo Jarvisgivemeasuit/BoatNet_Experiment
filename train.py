@@ -13,7 +13,7 @@ import experiment.utils.metrics as metrics
 from experiment.utils.args import Args
 from experiment.utils.utils import *
 from experiment.model import get_model, save_model
-from experiment.dataset.rssrai import Rssrai
+from experiment.dataset.rssrai2 import Rssrai
 
 import torch
 from torch import nn
@@ -27,12 +27,12 @@ class Trainer:
     def __init__(self, Args):
         self.num_classes = Rssrai.NUM_CLASSES
         self.args = Args
-        self.start_epoch = 64
+        self.start_epoch = 1
         self.epochs = self.args.epochs
         self.best_pred = 0
         self.best_miou = 0
 
-        train_set, val_set, self.num_classes = make_dataset(self.args.tr_batch_size, self.args.vd_batch_size)
+        train_set, val_set, self.num_classes = make_dataset()
         self.mean = train_set.mean
         self.std = train_set.std
         self.train_loader = DataLoader(train_set, batch_size=self.args.tr_batch_size,
@@ -40,25 +40,38 @@ class Trainer:
         self.val_loader = DataLoader(val_set, batch_size=self.args.vd_batch_size,
                                      shuffle=False, num_workers=self.args.num_workers)
 
+        self.net = get_model(self.args.model_name, self.args.backbone, self.args.inplanes, 2).cuda()
         # self.net = get_model(self.args.model_name, self.args.backbone, self.args.inplanes, self.num_classes).cuda()
-        self.net = torch.load('/home/arron/Documents/grey/paper/model_saving/resnet50-resunet-bast_pred.pth')
+        
+        # self.net = torch.load('/home/arron/Documents/grey/paper/model_saving/resnet50-resunet-bast_pred.pth')
+        
         self.optimizer = torch.optim.SGD(self.net.parameters(), lr=self.args.lr, momentum=0.9)
         if self.args.apex:
-            self.net = self.net.module
+            # self.net = self.net.module
             self.net, self.optimizer = amp.initialize(self.net, self.optimizer, opt_level='O1')
         self.net = nn.DataParallel(self.net, self.args.gpu_ids)
 
-        self.criterion = torch.nn.CrossEntropyLoss(ignore_index=255).cuda()
-        self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, [40, 60], 0.3)
+        # self.criterion = torch.nn.CrossEntropyLoss(ignore_index=255).cuda()
+        self.criterion = FocalLoss().cuda()
+        # self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, [20, 40, 60], 0.3)
+        self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, mode='min', factor=0.3, patience=3)
+        
         self.Metric = namedtuple('Metric', 'pixacc miou kappa')
 
+        # self.train_metric = self.Metric(pixacc=metrics.PixelAccuracy(),
+        #                                 miou=metrics.MeanIoU(self.num_classes),
+        #                                 kappa=metrics.Kappa(self.num_classes))
+
+        # self.val_metric = self.Metric(pixacc=metrics.PixelAccuracy(),
+        #                                 miou=metrics.MeanIoU(self.num_classes),
+        #                                 kappa=metrics.Kappa(self.num_classes))
         self.train_metric = self.Metric(pixacc=metrics.PixelAccuracy(),
-                                        miou=metrics.MeanIoU(self.num_classes),
-                                        kappa=metrics.Kappa(self.num_classes))
+                                        miou=metrics.MeanIoU(2),
+                                        kappa=metrics.Kappa(2))
 
         self.val_metric = self.Metric(pixacc=metrics.PixelAccuracy(),
-                                        miou=metrics.MeanIoU(self.num_classes),
-                                        kappa=metrics.Kappa(self.num_classes))
+                                        miou=metrics.MeanIoU(2),
+                                        kappa=metrics.Kappa(2))
 
     def training(self, epoch):
 
@@ -76,7 +89,9 @@ class Trainer:
         self.net.train()
 
         for idx, sample in enumerate(self.train_loader):
-            img, tar = sample['image'], sample['label']
+            # img, tar = sample['image'], sample['label']
+            img, tar = sample['image'], sample['binary_mask']
+            
             if self.args.cuda:
                 img, tar = img.cuda(), tar.cuda()
 
@@ -114,10 +129,10 @@ class Trainer:
         bar.finish()
         print('[Epoch: %d, numImages: %5d]' % (epoch, num_train * self.args.tr_batch_size))
         print('Train Loss: %.3f' % losses.avg)
-        if self.train_metric.pixacc.get() > self.best_pred and self.train_metric.miou.get() > self.best_miou:
-            self.best_pred = self.train_metric.pixacc.get()
-            self.best_miou = self.train_metric.miou.get()
-            save_model(self.net, self.args.model_name, 'resnet50')
+        # if self.train_metric.pixacc.get() > self.best_pred and self.train_metric.miou.get() > self.best_miou:
+        #     self.best_pred = self.train_metric.pixacc.get()
+        #     self.best_miou = self.train_metric.miou.get()
+        #     save_model(self.net, self.args.model_name, 'resnet50')
 
     def validation(self, epoch):
 
@@ -135,7 +150,8 @@ class Trainer:
         self.net.eval()
 
         for idx, sample in enumerate(self.val_loader):
-            img, tar = sample['image'], sample['label']
+            # img, tar = sample['image'], sample['label']
+            img, tar = sample['image'], sample['binary_mask']
             if self.args.cuda:
                 img, tar = img.cuda(), tar.cuda()
             with torch.no_grad():
@@ -174,6 +190,11 @@ class Trainer:
         print('Validation:')
         print(f"[Epoch: {epoch}, numImages: {num_val * self.args.vd_batch_size}]")
         print(f'Valid Loss: {losses.avg:.4f}')
+        if self.train_metric.pixacc.get() > self.best_pred and self.train_metric.miou.get() > self.best_miou:
+            self.best_pred = self.train_metric.pixacc.get()
+            self.best_miou = self.train_metric.miou.get()
+            save_model(self.net, self.args.model_name, 
+                       self.args.backbone1, self.args.annotations)
 
         return new_pred
 

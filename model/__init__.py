@@ -14,7 +14,7 @@ def get_model(model_name, backbone, inplanes, num_classes):
 def save_model(model, model_name, backbone1, backbone2=None, annotations=None):
     save_path = '/home/arron/Documents/grey/paper/model_saving/'
     if backbone2 is None:
-        torch.save(model1, os.path.join(save_path, "{}-{}-{}bast_pred.pth"
+        torch.save(model, os.path.join(save_path, "{}-{}-{}_bast_pred.pth"
                                         .format(backbone1, model_name, annotations)))
     else:
         torch.save(model, os.path.join(save_path, "{}-{}-{}-{}_bast_pred.pth"
