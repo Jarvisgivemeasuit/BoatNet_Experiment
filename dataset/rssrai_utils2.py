@@ -6,6 +6,7 @@ import numpy as np
 from collections import OrderedDict
 from libtiff import TIFF
 from progress.bar import Bar
+import albumentations as A
 
 
 color_name_map = OrderedDict({(0, 200, 0): '水田',
@@ -106,6 +107,7 @@ class ProcessingPath:
         return self.paths_dict
 
 
+# 将原图分割为crop_size的小图
 class ImageSpliter:
     def __init__(self, path_dict, crop_size=(256, 256)):
         self.data_path = path_dict['data_path']
@@ -176,6 +178,33 @@ class ImageSpliter:
             x = min(height, x + len_x)
             row_count += 1
         bar.finish()
+
+
+class RandomImageSpliter:
+    def __init__(self, path_dict, crop_size=(256, 256)):
+        self.data_path = path_dict['data_path']
+        self.save_path = path_dict['save_path']
+        self.crop_size = crop_size
+        self.valid_range_list = []
+
+    def random_crop():
+        img_path = os.path.join(self.data_path, 'img')
+        label_path = os.path.join(self.data_path, 'label')
+
+        file_list = os.listdir(img_path)
+        img_file = random.choice(file_list)
+        label_file = img_file.replace('.tif', '_label.tif')
+
+        img_obj = TIFF.open(os.path.join(img_path, img_file))
+        img = img_obj.read_image()
+        label_obj = TIFF.open(os.path.join(label_path, label_file))
+        label = label_obj.read_image()
+
+        topY = np.random.randint(img.shape[0])
+        leftX = np.random.randint(img.shape[1])
+        
+        crop_image = img[topY:topY + crop_size[0], leftX:leftX + crop_size[1], :]
+        return crop_image, [topY, leftX]
 
 
 class TestImageSpliter:
@@ -316,6 +345,24 @@ def save_label_map(paths_dict):
         bar.suffix = f'{i + 1} / {num_labels}'
         bar.next()
     bar.finish()
+
+
+# 统计类别数量
+def statistic(data_path):
+    data_list = os.listdir(os.path.join(data_path, 'mask'))
+    num = len(data_list)
+    bar = Bar('counting:', max=num)
+    res = np.zeros(16)
+    for idx, data_file in enumerate(data_list):
+        mask = np.load(os.path.join(data_path, 'mask', data_file))
+        for i in range(16):
+            count = (mask == i).sum()
+            res[i] += count
+            
+        bar.suffix = '{} / {}'.format(idx, num)
+        bar.next()
+    bar.finish()
+    return res
 
 
 # 将多类别label转换成前背景两类mask
