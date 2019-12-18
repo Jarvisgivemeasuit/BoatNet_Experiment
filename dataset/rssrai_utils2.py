@@ -254,11 +254,11 @@ class RandomImageSpliter:
         label_obj = TIFF.open(os.path.join(label_path, label_file))
         label = label_obj.read_image()
 
-        topY = np.random.randint(img.shape[0])
-        leftX = np.random.randint(img.shape[1])
+        topY = np.random.randint(img.shape[0] - self.crop_size[0])
+        leftX = np.random.randint(img.shape[1] - self.crop_size[1])
         
-        crop_image = img[topY:topY + self.crop_size[0], leftX:leftX + self.crop_size[1], :]
-        crop_label = label[topY:topY + self.crop_size[0], leftX:leftX + self.crop_size[1], :]
+        crop_image = img[topY:topY + self.crop_size[0], leftX:leftX + self.crop_size[1], :].transpose((2, 0, 1))
+        crop_label = label[topY:topY + self.crop_size[0], leftX:leftX + self.crop_size[1], :].transpose((2, 0, 1))
         return crop_image, crop_label, [img_file, topY, leftX]
 
 
@@ -519,14 +519,14 @@ if __name__ == '__main__':
     # spliter = TestImageSpliter(spliter_paths)
     # spliter.split_image()
 
-    spliter_paths = {}
-    spliter_paths['data_path'] = paths_dict['ori_path']
-    spliter_paths['train_path'] = paths_dict['train_split_256']
-    spliter_paths['val_path'] = paths_dict['val_split_256']
+    # spliter_paths = {}
+    # spliter_paths['data_path'] = paths_dict['ori_path']
+    # spliter_paths['train_path'] = paths_dict['train_split_256']
+    # spliter_paths['val_path'] = paths_dict['val_split_256']
 
-    spliter = RandomImageSpliter(spliter_paths)
+    # spliter = RandomImageSpliter(spliter_paths)
     # spliter.split_vd_image()
-    spliter.split_tr_image()
+    # spliter.split_tr_image()
 
 
     # division_paths = {}
@@ -537,11 +537,16 @@ if __name__ == '__main__':
     # train_valid(division_paths)
 
 
-    # transpose_paths = {}
-    # transpose_paths['data_path'] = os.path.join(paths_dict['data_split_256'], 'label')
-    # transpose_paths['save_path'] = os.path.join(paths_dict['data_split_256'], 'mask')
+    transpose_paths = {}
+    # transpose_paths['data_path'] = os.path.join(paths_dict['train_split_256'], 'label')
+    # transpose_paths['save_path'] = os.path.join(paths_dict['train_split_256'], 'mask')
 
     # save_label_map(transpose_paths)
+
+    transpose_paths['data_path'] = os.path.join(paths_dict['val_split_256'], 'label')
+    transpose_paths['save_path'] = os.path.join(paths_dict['val_split_256'], 'mask')
+
+    save_label_map(transpose_paths)
 
 
     # binary_paths = {}

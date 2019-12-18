@@ -6,6 +6,7 @@ from PIL import Image
 sys.path.append('../')
 
 from dataset import rssrai2
+from dataset import rssrai
 
 import torch
 from torch import nn

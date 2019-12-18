@@ -15,7 +15,7 @@ class Args:
         self.annotations = 'deconv-deconv'
 
         self.epochs = 150
-        self.lr = 0.05
+        self.lr = 0.1
         self.no_val = False
 
         self.gpu_ids = [0, 1]

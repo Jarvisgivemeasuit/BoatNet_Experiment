@@ -51,8 +51,8 @@ class Trainer:
             self.net, self.optimizer = amp.initialize(self.net, self.optimizer, opt_level='O1')
         self.net = nn.DataParallel(self.net, self.args.gpu_ids)
 
-        # self.criterion = torch.nn.CrossEntropyLoss(ignore_index=255).cuda()
-        self.criterion = FocalLoss().cuda()
+        self.criterion = torch.nn.CrossEntropyLoss().cuda()
+        # self.criterion = FocalLoss().cuda()
         self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, [20, 40, 60, 100], 0.3)
         # self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, mode='min', factor=0.3, patience=3)
         

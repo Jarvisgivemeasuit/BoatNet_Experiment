@@ -50,8 +50,8 @@ class Trainer:
             self.net, self.optimizer = amp.initialize(self.net, self.optimizer, opt_level='O1')
         self.net = nn.DataParallel(self.net, self.args.gpu_ids)
 
-        # self.criterion = FocalLoss().cuda()
-        self.criterion = nn.CrossEntropyLoss().cuda()
+        self.criterion = FocalLoss().cuda()
+        # self.criterion = nn.CrossEntropyLoss().cuda()
 
         self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, mode='min', factor=0.1, patience=4)
 
@@ -79,20 +79,20 @@ class Trainer:
         self.net.train()
 
         for idx, sample in enumerate(self.train_loader):
-            img, tar, bmask, rate = sample['image'], sample['label'], sample['binary_mask'], sample['ratios']
+            img, tar = sample['image'], sample['label']
             if self.args.cuda:
-                img, tar, bmask, rate = img.cuda(), tar.cuda(), bmask.cuda(), rate.cuda()
+                img, tar = img.cuda(), tar.cuda()
 
             self.optimizer.zero_grad()
             # fg_mask, pred_rate = self.net(img)[:2]
             fg_mask = self.net(img)
-            # print(fg_mask.shape, bmask.shape)
+            # print(fg_mask.shape, tar.shape)
             loss = self.criterion(fg_mask, tar.long())
 
             losses.update(loss.item())
 
-            self.train_metric.pixacc.update(fg_mask, bmask)
-            self.train_metric.miou.update(fg_mask, bmask)
+            self.train_metric.pixacc.update(fg_mask, tar)
+            self.train_metric.miou.update(fg_mask, tar)
             
             if self.args.apex:
                 with amp.scale_loss(loss, self.optimizer) as scale_loss:
@@ -134,21 +134,21 @@ class Trainer:
         self.net.eval()
 
         for idx, sample in enumerate(self.val_loader):
-            img, tar, bmask, rate = sample['image'], sample['label'], sample['binary_mask'], sample['ratios']
+            img, tar = sample['image'], sample['label']
             if self.args.cuda:
-                img, tar, bmask, rate = img.cuda(), tar.cuda(), bmask.cuda(), rate.cuda()
+                img, tar = img.cuda(), tar.cuda
 
             with torch.no_grad():
                 # fg_mask, pred_rate = self.net(img)[:2]
                 fg_mask = self.net(img)
 
-            loss = self.criterion1(fg_mask, bmask.long())
+            loss = self.criterion1(fg_mask, tar.long())
             # loss = abs((pred_rate - rate.float())).sum() / self.args.tr_batch_size
 
             losses.update(loss)
 
-            self.val_metric.pixacc.update(fg_mask, bmask)
-            self.val_metric.miou.update(fg_mask, bmask)
+            self.val_metric.pixacc.update(fg_mask, tar)
+            self.val_metric.miou.update(fg_mask, tar)
 
             batch_time.update(time.time() - starttime)
             starttime = time.time()

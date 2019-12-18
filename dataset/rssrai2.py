@@ -18,7 +18,7 @@ from .rssrai_utils2 import *
 class Rssrai(Dataset):
     NUM_CLASSES = 16
     
-    def __init__(self, mode='train', base_dir=Path.get_root_path('rssrai_grey')):
+    def __init__(self, mode='train', base_dir=Path.get_root_path('rssrai_increase')):
         assert mode in ['train', 'val', 'test']
         super().__init__()
 
@@ -62,9 +62,10 @@ class Rssrai(Dataset):
     def load_numpy(self, idx, mode):
         image = np.load(os.path.join(self._image_dir, self._data_list[idx]))
         mask = np.load(os.path.join(self._label_dir, self._data_list[idx]))
-        binary_dict = np.load(os.path.join(self._ratios_dir, self._data_list[idx]), allow_pickle=True).item()
-        binary_mask, ratios = binary_dict['binary_mask'], binary_dict['ratios']
-        
+
+        # binary_dict = np.load(os.path.join(self._ratios_dir, self._data_list[idx]), allow_pickle=True).item()
+        # binary_mask, ratios = binary_dict['binary_mask'], binary_dict['ratios']
+        # print(image.shape)
         sample = {'image': image, 'label': mask}
         if mode == 'train':
             sample = self._train_enhance(sample)
@@ -72,10 +73,10 @@ class Rssrai(Dataset):
             sample = self._valid_enhance(sample)
             
         sample['image'] = sample['image'].transpose((2, 0, 1))
-        sample['binary_mask'] = binary_mask
-        sample['ratios'] = np.array([ratios[:-1, 0].sum(), 1 - ratios[:-1, 0].sum()])
+        # sample['binary_mask'] = binary_mask
+        # sample['ratios'] = np.array([ratios[:-1, 0].sum(), 1 - ratios[:-1, 0].sum()])
         # sample['ratios'] = ratios.transpose((1, 0))
-        # print(sample['ratios'])
+        # print(sample['image'].shape)
         return sample
 
     def load_img(self, idx):
@@ -105,12 +106,12 @@ class Rssrai(Dataset):
 
     def _train_enhance(self, sample):
         compose = A.Compose([
-            A.ShiftScaleRotate(),
-            A.RGBShift(),
-            A.Blur(),
-            A.GaussNoise(),
-            A.ElasticTransform(),
-            A.Cutout(p=1),
+            # A.ShiftScaleRotate(),
+            # A.RGBShift(),
+            # A.Blur(),
+            # A.GaussNoise(),
+            # A.ElasticTransform(),
+            # A.Cutout(p=1),
             A.Normalize(mean=self.mean, std=self.std, p=1),
         ], additional_targets={'image': 'image', 'label': 'mask'})
         sample['image'] = sample['image'].transpose((1, 2, 0))
