@@ -129,10 +129,10 @@ class Trainer:
         bar.finish()
         print('[Epoch: %d, numImages: %5d]' % (epoch, num_train * self.args.tr_batch_size))
         print('Train Loss: %.3f' % losses.avg)
-        # if self.train_metric.pixacc.get() > self.best_pred and self.train_metric.miou.get() > self.best_miou:
-        #     self.best_pred = self.train_metric.pixacc.get()
-        #     self.best_miou = self.train_metric.miou.get()
-        #     save_model(self.net, self.args.model_name, 'resnet50')
+        if self.train_metric.pixacc.get() > self.best_pred and self.train_metric.miou.get() > self.best_miou:
+            self.best_pred = self.train_metric.pixacc.get()
+            self.best_miou = self.train_metric.miou.get()
+            save_model(self.net, self.args.model_name, 'resnet50')
 
     def validation(self, epoch):
 
