@@ -56,8 +56,8 @@ class Rssrai(Dataset):
             return self.load_test_numpy(idx)
 
     def load_test_numpy(self, idx):
-        img = np.load(os.path.join(self._image_dir, self._test_img_list[idx]))
-        return img, self._test_img_list[idx]
+        img = np.load(os.path.join(self._image_dir, self._data_list[idx]))
+        return img, self._data_list[idx]
 
     def load_numpy(self, idx, mode):
         image = np.load(os.path.join(self._image_dir, self._data_list[idx]))

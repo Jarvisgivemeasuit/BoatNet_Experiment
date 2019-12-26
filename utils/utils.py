@@ -210,37 +210,39 @@ class SuperMerger:
                     x14, y14 = int(len_x * 0.25), int(len_y * 0.25)
                     x12, y12 = x34 - x14, y34 - y14
                     
+                    # print(x, x * x12 + x14, y, y * y12 + y14)
                     if x == 0 and y == 0:
                         img = img[:x34, :y34, :]
                         res[:x34, :y34, :] = img
                     elif x == 0 and y == max_y - 1:
                         img = img[:x34, y14:, :]
-                        res[:x34, y * y12 + y14:, :] = img
+                        res[:x34, -y34:, :] = img
                     elif x == max_x - 1 and y == 0:
                         img = img[x14:, :y34, :]
-                        res[x * x12 + x14:, :y34, :] = img
+                        res[-x34:, :y34, :] = img
                     elif x == max_x - 1 and y == max_y - 1:
                         img = img[x14:, y14:, :]
-                        res[x * x12 + x14:, y * y12 + y14:, :] = img
+                        res[-x34:,-y34:, :] = img
                     elif x == 0:
                         img = img[:x34, y14:y34, :]
                         res[:x34, y * y12 + y14:(y + 1) * y12 + y14, :] = img
                     elif y == 0:
                         img = img[x14:x34, :y34, :]
                         res[x * x12 + x14:(x + 1) * x12 + x14, :y34, :] = img
+                        
                     elif x == max_x - 1:
                         img = img[x14:, y14:y34, :]
-                        res[x * x12 + x14:, y * y12 + y14:(y + 1) * y12 + y14, :] = img
+                        res[-x34:, y * y12 + y14:(y + 1) * y12 + y14, :] = img
                     elif y == max_y - 1:
                         img = img[x14:x34, y14:, :]
-                        res[x * x12 + x14:(x + 1) * x12 + x14, y * y12 + y14:, :] = img
+                        res[x * x12 + x14:(x + 1) * x12 + x14, -y34:, :] = img
                     else:
                         img = img[x14:x34, y14:y34, :]
                         res[x * x12 + x14:(x + 1) * x12 + x14, y * y12 + y14:(y + 1) * y12 + y14, :] = img
                         
             res_img = Image.fromarray(np.uint8(res))
 
-            final_path = make_sure_path_exists(os.path.join(self.save_path, self._dir))
+            final_path = make_sure_path_exists(self.save_path)
             res_img.save(os.path.join(final_path, ori_img_file))
 
             print(f"{ori_img_name} merge complete.")
@@ -251,6 +253,7 @@ class SuperMerger:
         xs, ys = [], []
 
         for img_file in img_list:
+            # print(img_file)
             img_name, x, y = self.get_image_message(img_file)
             if self.ori_list[0].replace('.tif', '') == img_name[:-1]:
                 xs.append(int(x))
@@ -258,8 +261,9 @@ class SuperMerger:
         return max(xs), max(ys)
             
     def get_image_message(self, img_file):
+        # print(img_file)
         split_tmp = img_file.split('_')[-2:]
-        y, x = split_tmp[0], split_tmp[1].replace('.tif', '')
+        x, y = split_tmp[0], split_tmp[1].replace('.tif', '')
         return img_file.replace("_".join(split_tmp), ''), x, y
 
 
@@ -312,9 +316,20 @@ class FocalLoss(nn.Module):
 
 
 if __name__ == '__main__':
-    path = '/home/arron/dataset/rssrai_grey/test_split_256'
-    save_path = '/home/arron/dataset/rssrai_grey/results/resunet50' 
-    res_path = '/home/arron/dataset/rssrai_grey/results/tmp_output'
+    path = '/home/arron/dataset/rssrai_grey/rssrai/test'
+    save_path = '/home/arron/dataset/rssrai_grey/results/resunet-resnet50' 
+    res_path = '/home/arron/dataset/rssrai_grey/results/tmp_output/resunet-resnet50'
     supermerger = SuperMerger(path, res_path, save_path)
     supermerger.merge_image()
     # print(supermerger.ori_list)
+
+
+    # lists = os.listdir(res_path)
+    # i = 0
+    # for files in lists:
+    #     if '_'.join(files.split('_')[:-2]) == 'GF2_PMS1__20160623_L1A0001660727-MSS1':
+    #         print(files)
+    #         i += 1
+    # print(i)
+    # print(len(lists))
+    

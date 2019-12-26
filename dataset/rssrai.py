@@ -39,7 +39,7 @@ class Rssrai(Dataset):
             self.len = len(self._label_name_list)
 
         if self._mode == 'test':
-            self._image_dir = os.path.join(self._base_dir, 'test/test_split/')
+            self._image_dir = os.path.join(self._base_dir, 'test/test_split_256/')
             self._test_img_list = os.listdir(self._image_dir)
             self._test_name_list = [name.split('.')[0] for name in self._test_img_list]
             self.len = len(self._test_name_list)

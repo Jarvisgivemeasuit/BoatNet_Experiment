@@ -10,7 +10,7 @@ sys.path.append("/home/arron/Documents/grey/paper/experiment")
 from utils.args import Args
 from utils.utils import *
 from model import get_model, save_model
-from dataset.rssrai import Rssrai
+from dataset.rssrai2 import Rssrai
 
 import torch
 from torch import nn
@@ -23,12 +23,13 @@ import numpy as np
 class Tester:
     def __init__(self, Args):
         self.args = Args()
-        self.test_set = Rssrai(mode='test', batch_size=2)
+        self.test_set = Rssrai(mode='test')
         self.num_classes = self.test_set.NUM_CLASSES
         self.test_loader = DataLoader(self.test_set, batch_size=2, shuffle=False, num_workers=self.args.num_workers)
-        self.net = get_model(self.args.model_name, self.args.backbone, self.args.inplanes, self.num_classes).cuda()
+        self.net = None
 
     def testing(self, param_path, save_path):
+        print('length of test set:', len(self.test_set))
 
         batch_time = AverageMeter()
         starttime = time.time()
@@ -45,9 +46,8 @@ class Tester:
 
         for idx, [img, img_file] in enumerate(self.test_loader):
             if self.args.cuda:
-                img = img.cuda()
+                img = img.float().cuda()
             with torch.no_grad():
-
                 output = self.net(img)
             
             final_save_path = make_sure_path_exists(os.path.join(save_path, f"{self.args.model_name}-{self.args.backbone}"))
@@ -76,7 +76,7 @@ class Tester:
 
 def test():
     save_result_path = '/home/arron/dataset/rssrai_grey/results/tmp_output'
-    param_path = '/home/arron/Documents/grey/paper/model_saving/'
+    param_path = '/home/arron/Documents/grey/paper/model_saving/resnet50-resunet-None_bast_pred.pth'
     tester = Tester(Args)
 
     print("==> Start testing")

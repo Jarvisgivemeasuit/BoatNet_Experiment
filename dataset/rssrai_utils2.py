@@ -297,14 +297,14 @@ class TestImageSpliter:
             y = 0
             col_count = 0
             while y < width:
-                if y > width - len_y // 2 and x > height - len_x // 2:
-                    split_image = img[:, height - len_x // 2:, width - len_y // 2:]
-                elif y > width - len_y // 2:
-                    split_image = img[:, x:x + len_x // 2, width - len_y // 2:]
-                elif x > height - len_x // 2:
-                    split_image = img[:, height - len_x // 2:, y:y + len_y // 2]
+                if y > width - len_y and x > height - len_x:
+                    split_image = img[:, height - len_x:, width - len_y:]
+                elif y > width - len_y:
+                    split_image = img[:, x:x + len_x, width - len_y:]
+                elif x > height - len_x:
+                    split_image = img[:, height - len_x:, y:y + len_y]
                 else:
-                    split_image = img[:, x:x + len_x // 2, y:y + len_y // 2]
+                    split_image = img[:, x:x + len_x, y:y + len_y]
 
                 if tp == 'image':
                     split_image_name = '_'.join([img_name, str(row_count), str(col_count)])
@@ -510,14 +510,14 @@ if __name__ == '__main__':
     paths_obj = ProcessingPath()
     paths_dict = paths_obj.get_paths_dict(mode='all')
 
-    # spliter_paths = {}
-    # spliter_paths['data_path'] = paths_dict['test_path']
-    # spliter_paths['save_path'] = paths_dict['test_split_256']
-    # spliter_paths['img_format'] = '.tif'
+    spliter_paths = {}
+    spliter_paths['data_path'] = paths_dict['test_path']
+    spliter_paths['save_path'] = paths_dict['test_split_256']
+    spliter_paths['img_format'] = '.tif'
 
-    # # spliter = ImageSpliter(spliter_paths)
-    # spliter = TestImageSpliter(spliter_paths)
-    # spliter.split_image()
+    # spliter = ImageSpliter(spliter_paths)
+    spliter = TestImageSpliter(spliter_paths)
+    spliter.split_image()
 
     # spliter_paths = {}
     # spliter_paths['data_path'] = paths_dict['ori_path']
@@ -537,16 +537,16 @@ if __name__ == '__main__':
     # train_valid(division_paths)
 
 
-    transpose_paths = {}
+    # transpose_paths = {}
     # transpose_paths['data_path'] = os.path.join(paths_dict['train_split_256'], 'label')
     # transpose_paths['save_path'] = os.path.join(paths_dict['train_split_256'], 'mask')
 
     # save_label_map(transpose_paths)
 
-    transpose_paths['data_path'] = os.path.join(paths_dict['val_split_256'], 'label')
-    transpose_paths['save_path'] = os.path.join(paths_dict['val_split_256'], 'mask')
+    # transpose_paths['data_path'] = os.path.join(paths_dict['val_split_256'], 'label')
+    # transpose_paths['save_path'] = os.path.join(paths_dict['val_split_256'], 'mask')
 
-    save_label_map(transpose_paths)
+    # save_label_map(transpose_paths)
 
 
     # binary_paths = {}
