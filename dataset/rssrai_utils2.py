@@ -442,10 +442,10 @@ def fore_back(path_dict):
     bar.finish()
 
 
-def fore_back_ratios(path_dict):
+def multi_fore_back_ratios(path_dict):
     img_list = os.listdir(path_dict['data_path'])
     num_imgs = len(img_list)
-    bar = Bar('Saving binary file:', max=num_imgs)
+    bar = Bar('Saving binary file and ratios:', max=num_imgs)
 
     for i, mask_file in enumerate(img_list):
         mask = np.load(os.path.join(path_dict['data_path'], mask_file))
@@ -508,10 +508,10 @@ def _std(path, img_list, mean, pixels_num):
 
 if __name__ == '__main__':
     paths_obj = ProcessingPath()
-    paths_dict = paths_obj.get_paths_dict(mode='all')
+    paths_dict = paths_obj.get_paths_dict(mode='img')
 
     spliter_paths = {}
-    spliter_paths['data_path'] = paths_dict['test_path']
+    spliter_paths['data_path'] = paths_dict['ori_path']
     spliter_paths['save_path'] = paths_dict['test_split_256']
     spliter_paths['img_format'] = '.tif'
 
@@ -550,7 +550,7 @@ if __name__ == '__main__':
 
 
     # binary_paths = {}
-    # binary_paths['data_path'] = os.path.join(paths_dict['data_split_256'], 'mask')
-    # binary_paths['save_path'] = os.path.join(paths_dict['data_split_256'], 'binary_mask')
+    # binary_paths['data_path'] = os.path.join(paths_dict['train_split_256'], 'mask')
+    # binary_paths['save_path'] = os.path.join(paths_dict['train_split_256'], 'ratios')
     
-    # fore_back_ratios(binary_paths)
+    # multi_fore_back_ratios(binary_paths)

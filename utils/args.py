@@ -8,7 +8,7 @@ class Args:
         self.num_workers = 8
         self.inplanes = 4
 
-        self.model_name = 'resunet'
+        self.model_name = 'dt_resunet'
         self.backbone = 'resnet50'
         self.backbone1 = 'resnet50'
         self.backbone2 = 'resnet34'

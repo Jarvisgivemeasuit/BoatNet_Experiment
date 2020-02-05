@@ -42,17 +42,18 @@ class Trainer:
 
         # self.net = get_model(self.args.model_name, self.args.backbone, self.args.inplanes, 2).cuda()
         self.net = get_model(self.args.model_name, self.args.backbone, self.args.inplanes, self.num_classes).cuda()
-        
+
         # self.net = torch.load('/home/arron/Documents/grey/paper/model_saving/resnet50-resunet-bast_pred.pth')
-        
+
         self.optimizer = torch.optim.SGD(self.net.parameters(), lr=self.args.lr, momentum=0.9)
         if self.args.apex:
             # self.net = self.net.module
             self.net, self.optimizer = amp.initialize(self.net, self.optimizer, opt_level='O1')
         self.net = nn.DataParallel(self.net, self.args.gpu_ids)
 
-        self.criterion = torch.nn.CrossEntropyLoss().cuda()
-        # self.criterion = FocalLoss().cuda()
+        # self.criterion = torch.nn.CrossEntropyLoss().cuda()
+        self.criterion1 = FocalLoss().cuda()
+        self.criterion2 = SoftCrossEntropyLoss().cuda()
         self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, [20, 40, 60, 100], 0.3)
         # self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, mode='min', factor=0.3, patience=3)
         
@@ -65,13 +66,6 @@ class Trainer:
         self.val_metric = self.Metric(pixacc=metrics.PixelAccuracy(),
                                         miou=metrics.MeanIoU(self.num_classes),
                                         kappa=metrics.Kappa(self.num_classes))
-        # self.train_metric = self.Metric(pixacc=metrics.PixelAccuracy(),
-        #                                 miou=metrics.MeanIoU(2),
-        #                                 kappa=metrics.Kappa(2))
-
-        # self.val_metric = self.Metric(pixacc=metrics.PixelAccuracy(),
-        #                                 miou=metrics.MeanIoU(2),
-        #                                 kappa=metrics.Kappa(2))
 
     def training(self, epoch):
 
@@ -89,16 +83,17 @@ class Trainer:
         self.net.train()
 
         for idx, sample in enumerate(self.train_loader):
-            img, tar = sample['image'], sample['label']
-            # img, tar = sample['image'], sample['binary_mask']
-            
+            img, tar, ratios = sample['image'], sample['label'], sample['ratios']
+
             if self.args.cuda:
-                img, tar = img.cuda(), tar.cuda()
+                img, tar, ratios = img.cuda(), tar.cuda(), ratios.cuda()
 
             self.optimizer.zero_grad()
-            output = self.net(img)
-            loss = self.criterion(output, tar.long())
-            losses.update(loss.item())
+            [output_ratios, output] = self.net(img)
+
+            loss1 = self.criterion1(output, tar.long())
+            loss2 = self.criterion2(output_ratios, ratios.float())
+            losses.update(loss1.item() + loss2.item())
 
             self.train_metric.pixacc.update(output, tar)
             self.train_metric.miou.update(output, tar)
@@ -114,8 +109,7 @@ class Trainer:
             batch_time.update(time.time() - starttime)
             starttime = time.time()
 
-            # bar.suffix = '({batch}/{size}) Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss: {loss:.4f} | Acc: {Acc: .4f} | mIoU: {mIoU: .4f} | kappa: {kappa: .4f}'.format(
-            bar.suffix = '({batch}/{size}) Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss: {loss:.4f} | Acc: {Acc: .4f} | mIoU: {mIoU: .4f}'.format(
+            bar.suffix = '({batch}/{size}) Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss: {loss:.4f} | Acc: {Acc: .4f} | mIoU: {mIoU: .4f} | kappa: {kappa: .4f}'.format(
                 batch=idx + 1,
                 size=len(self.train_loader),
                 bt=batch_time.avg,
@@ -124,7 +118,7 @@ class Trainer:
                 loss=losses.avg,
                 mIoU=self.train_metric.miou.get(),
                 Acc=self.train_metric.pixacc.get(),
-                # kappa=self.train_metric.kappa.get()
+                kappa=self.train_metric.kappa.get()
             )
             bar.next()
         bar.finish()
@@ -170,8 +164,7 @@ class Trainer:
             batch_time.update(time.time() - starttime)
             starttime = time.time()
 
-            # bar.suffix = '({batch}/{size}) Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss: {loss:.4f} | Acc: {Acc: .4f} | mIoU: {mIoU: .4f} | kappa: {kappa: .4f}'.format(
-            bar.suffix = '({batch}/{size}) Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss: {loss:.4f} | Acc: {Acc: .4f} | mIoU: {mIoU: .4f}'.format(
+            bar.suffix = '({batch}/{size}) Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss: {loss:.4f} | Acc: {Acc: .4f} | mIoU: {mIoU: .4f} | kappa: {kappa: .4f}'.format(
                 batch=idx + 1,
                 size=len(self.val_loader),
                 bt=batch_time.avg,
@@ -180,7 +173,7 @@ class Trainer:
                 loss=losses.avg,
                 mIoU=self.val_metric.miou.get(),
                 Acc=self.val_metric.pixacc.get(),
-                # kappa=self.val_metric.kappa.get()
+                kappa=self.val_metric.kappa.get()
             )
             bar.next()
         bar.finish()
