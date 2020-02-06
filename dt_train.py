@@ -96,18 +96,18 @@ class Trainer:
 
             loss1 = self.criterion1(output, tar.long())
             loss2 = self.criterion2(output_ratios, ratios.float())
-            loss = loss1
+            loss = loss1 + loss2
             losses1.update(loss1)
             losses2.update(loss2)
             losses.update(loss)
 
-            # output_tmp = output.permute(2, 3, 0, 1)
-            # output_ratios = F.softmax(output_ratios, dim=1)
-            # output_tmp = F.softmax(output_tmp, dim=1)
-            # dynamic = output_tmp > (1 - output_ratios) / (self.num_classes - 1)
-            # dynamic = dynamic.permute(2, 3, 0, 1)
-            # output_tmp = output_tmp.permute(2, 3, 0, 1)
-            # output = output_tmp * dynamic.float()
+            output_tmp = output.permute(2, 3, 0, 1)
+            output_ratios = F.softmax(output_ratios, dim=1)
+            output_tmp = F.softmax(output_tmp, dim=1)
+            dynamic = output_tmp > (1 - output_ratios) / (self.num_classes - 1)
+            dynamic = dynamic.permute(2, 3, 0, 1)
+            output_tmp = output_tmp.permute(2, 3, 0, 1)
+            output = output_tmp * dynamic.float()
 
             self.train_metric.pixacc.update(output, tar)
             self.train_metric.miou.update(output, tar)
@@ -172,18 +172,18 @@ class Trainer:
 
             loss1 = self.criterion1(output, tar.long())
             loss2 = self.criterion2(output_ratios, ratios.float())
-            loss = loss1 + 10 * loss2
+            loss = loss1 + loss2
             losses1.update(loss1)
             losses2.update(loss2)
             losses.update(loss)
 
-            # output_tmp = output.permute(2, 3, 0, 1)
-            # output_ratios = F.softmax(output_ratios, dim=1)
-            # output_tmp = F.softmax(output_tmp, dim=1)
-            # dynamic = output_tmp > (1 - output_ratios) / (self.num_classes - 1)
-            # dynamic = dynamic.permute(2, 3, 0, 1)
-            # output_tmp = output_tmp.permute(2, 3, 0, 1)
-            # output = output_tmp * dynamic.float()
+            output_tmp = output.permute(2, 3, 0, 1)
+            output_ratios = F.softmax(output_ratios, dim=1)
+            output_tmp = F.softmax(output_tmp, dim=1)
+            dynamic = output_tmp > (1 - output_ratios) / (self.num_classes - 1)
+            dynamic = dynamic.permute(2, 3, 0, 1)
+            output_tmp = output_tmp.permute(2, 3, 0, 1)
+            output = output_tmp * dynamic.float()
 
             self.val_metric.pixacc.update(output, tar)
             self.val_metric.miou.update(output, tar)

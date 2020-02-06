@@ -61,9 +61,11 @@ class Pred_Fore_Rate(nn.Module):
         super().__init__()
         self.de_ratio = ChDecrease(512, 32)
         self.pool = nn.AdaptiveAvgPool2d(1)
+        self.double_conv = Double_conv(16, 16)
 
     def forward(self, x):
         x = self.de_ratio(x)
+        x = self.double_conv(x)
         x = self.pool(x)
         x = x.reshape(x.shape[0], x.shape[1])
 
@@ -145,7 +147,6 @@ class Dy_UNet(nn.Module):
         self.up4 = Up(64, 128, 64, last_cat=True)
         self.up5 = Up(64, 68, 64)
 
-        self.softmax = nn.Softmax(dim=1)
         self.outconv = Double_conv(64, self.num_classes)
 
     def forward(self, x):
@@ -159,7 +160,8 @@ class Dy_UNet(nn.Module):
             x4 = self.de4(x4)
         # print(x0.shape, x1.shape, x2.shape, x3.shape, x4.shape)
 
-        ratios = self.fore_pred(x4).float()
+        x4_ = x4.detach()
+        ratios = self.fore_pred(x4_).float()
 
         x = self.up1(x4, x3)
         x = self.up2(x, x2)
