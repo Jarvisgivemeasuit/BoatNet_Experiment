@@ -10,8 +10,6 @@ class Args:
 
         self.model_name = 'dt_resunet'
         self.backbone = 'resnet50'
-        self.backbone1 = 'resnet50'
-        self.backbone2 = 'resnet34'
         self.annotations = 'deconv-deconv'
 
         self.epochs = 150

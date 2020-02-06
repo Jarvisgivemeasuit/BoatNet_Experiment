@@ -144,7 +144,7 @@ class Dy_UNet(nn.Module):
         self.up3 = Up(128, 192, 64)
         self.up4 = Up(64, 128, 64, last_cat=True)
         self.up5 = Up(64, 68, 64)
-        
+
         self.softmax = nn.Softmax(dim=1)
         self.outconv = Double_conv(64, self.num_classes)
 
@@ -168,11 +168,6 @@ class Dy_UNet(nn.Module):
         x = self.up5(x, ori_x)
 
         output = self.outconv(x)
-
-        output_tmp = output.permute(2, 3, 0, 1)
-        dynamic = output_tmp > (1 - ratios) / (self.num_classes - 1)
-        dynamic = dynamic.permute(2, 3, 0, 1)
-        output = output * dynamic.float() 
 
         return ratios, output
 

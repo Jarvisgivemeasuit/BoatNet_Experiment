@@ -19,6 +19,7 @@ import torch
 from torch import nn
 import torch.utils.data
 from torch.utils.data import DataLoader
+import torch.nn.functional as F
 import torch.optim
 import numpy as np 
 
@@ -51,8 +52,8 @@ class Trainer:
             self.net, self.optimizer = amp.initialize(self.net, self.optimizer, opt_level='O1')
         self.net = nn.DataParallel(self.net, self.args.gpu_ids)
 
-        # self.criterion = torch.nn.CrossEntropyLoss().cuda()
-        self.criterion1 = FocalLoss().cuda()
+        self.criterion1 = torch.nn.CrossEntropyLoss().cuda()
+        # self.criterion1 = FocalLoss().cuda()
         self.criterion2 = SoftCrossEntropyLoss().cuda()
         self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, [20, 40, 60, 100], 0.3)
         # self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, mode='min', factor=0.3, patience=3)
@@ -74,6 +75,8 @@ class Trainer:
         self.train_metric.pixacc.reset()
 
         batch_time = AverageMeter()
+        losses1 = AverageMeter()
+        losses2 = AverageMeter()
         losses = AverageMeter()
         starttime = time.time()
 
@@ -93,7 +96,18 @@ class Trainer:
 
             loss1 = self.criterion1(output, tar.long())
             loss2 = self.criterion2(output_ratios, ratios.float())
-            losses.update(loss1.item() + loss2.item())
+            loss = loss1
+            losses1.update(loss1)
+            losses2.update(loss2)
+            losses.update(loss)
+
+            # output_tmp = output.permute(2, 3, 0, 1)
+            # output_ratios = F.softmax(output_ratios, dim=1)
+            # output_tmp = F.softmax(output_tmp, dim=1)
+            # dynamic = output_tmp > (1 - output_ratios) / (self.num_classes - 1)
+            # dynamic = dynamic.permute(2, 3, 0, 1)
+            # output_tmp = output_tmp.permute(2, 3, 0, 1)
+            # output = output_tmp * dynamic.float()
 
             self.train_metric.pixacc.update(output, tar)
             self.train_metric.miou.update(output, tar)
@@ -109,13 +123,15 @@ class Trainer:
             batch_time.update(time.time() - starttime)
             starttime = time.time()
 
-            bar.suffix = '({batch}/{size}) Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss: {loss:.4f} | Acc: {Acc: .4f} | mIoU: {mIoU: .4f} | kappa: {kappa: .4f}'.format(
+            bar.suffix = '({batch}/{size}) Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss: {loss:.4f}, loss1: {loss1:.4f}, loss2: {loss2:.4f} | Acc: {Acc: .4f} | mIoU: {mIoU: .4f} | kappa: {kappa: .4f}'.format(
                 batch=idx + 1,
                 size=len(self.train_loader),
                 bt=batch_time.avg,
                 total=bar.elapsed_td,
                 eta=bar.eta_td,
                 loss=losses.avg,
+                loss1=losses1.avg,
+                loss2=losses2.avg,
                 mIoU=self.train_metric.miou.get(),
                 Acc=self.train_metric.pixacc.get(),
                 kappa=self.train_metric.kappa.get()
@@ -136,6 +152,8 @@ class Trainer:
         self.val_metric.pixacc.reset()
 
         batch_time = AverageMeter()
+        losses1 = AverageMeter()
+        losses2 = AverageMeter()
         losses = AverageMeter()
         starttime = time.time()
 
@@ -145,32 +163,47 @@ class Trainer:
         self.net.eval()
 
         for idx, sample in enumerate(self.val_loader):
-            img, tar = sample['image'], sample['label']
-            # img, tar = sample['image'], sample['binary_mask']
+            img, tar, ratios = sample['image'], sample['label'], sample['ratios']
+
             if self.args.cuda:
-                img, tar = img.cuda(), tar.cuda()
+                img, tar, ratios = img.cuda(), tar.cuda(), ratios.cuda()
             with torch.no_grad():
-                output = self.net(img)
-            loss = self.criterion(output, tar.long())
-            losses.update(loss.item())
+                [output_ratios, output] = self.net(img)
+
+            loss1 = self.criterion1(output, tar.long())
+            loss2 = self.criterion2(output_ratios, ratios.float())
+            loss = loss1 + 10 * loss2
+            losses1.update(loss1)
+            losses2.update(loss2)
+            losses.update(loss)
+
+            # output_tmp = output.permute(2, 3, 0, 1)
+            # output_ratios = F.softmax(output_ratios, dim=1)
+            # output_tmp = F.softmax(output_tmp, dim=1)
+            # dynamic = output_tmp > (1 - output_ratios) / (self.num_classes - 1)
+            # dynamic = dynamic.permute(2, 3, 0, 1)
+            # output_tmp = output_tmp.permute(2, 3, 0, 1)
+            # output = output_tmp * dynamic.float()
 
             self.val_metric.pixacc.update(output, tar)
             self.val_metric.miou.update(output, tar)
             self.val_metric.kappa.update(output, tar)
-            
+
             if idx % 5 == 0:
                 self.visualize_batch_image(img, tar, output, epoch, idx)
 
             batch_time.update(time.time() - starttime)
             starttime = time.time()
 
-            bar.suffix = '({batch}/{size}) Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss: {loss:.4f} | Acc: {Acc: .4f} | mIoU: {mIoU: .4f} | kappa: {kappa: .4f}'.format(
+            bar.suffix = '({batch}/{size}) Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss: {loss:.4f}, loss1: {loss1:.4f}, loss2: {loss2:.4f}| Acc: {Acc: .4f} | mIoU: {mIoU: .4f} | kappa: {kappa: .4f}'.format(
                 batch=idx + 1,
                 size=len(self.val_loader),
                 bt=batch_time.avg,
                 total=bar.elapsed_td,
                 eta=bar.eta_td,
                 loss=losses.avg,
+                loss1=losses1.avg,
+                loss2=losses2.avg,
                 mIoU=self.val_metric.miou.get(),
                 Acc=self.val_metric.pixacc.get(),
                 kappa=self.val_metric.kappa.get()

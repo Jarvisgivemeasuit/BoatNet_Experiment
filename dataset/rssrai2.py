@@ -75,7 +75,7 @@ class Rssrai(Dataset):
         sample['image'] = sample['image'].transpose((2, 0, 1))
         # print(binary_dict['ratios'], binary_dict['ratios'].shape)
         # sample['binary_mask'] = binary_mask
-        sample['ratios'] = np.array(ratios[:-1, 0])
+        sample['ratios'] = np.array(ratios[:, 0])
         # sample['ratios'] = ratios.transpose((1, 0))
         # print(sample['image'].shape)
         return sample
