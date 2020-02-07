@@ -57,7 +57,7 @@ class ResDown(nn.Module):
 
 
 class Pred_Fore_Rate(nn.Module):
-    def __init__(self, inplanes, planes):
+    def __init__(self):
         super().__init__()
         self.de_ratio = ChDecrease(512, 32)
         self.pool = nn.AdaptiveAvgPool2d(1)
@@ -139,8 +139,6 @@ class Dy_UNet(nn.Module):
             self.de3 = ChDecrease(1024, 4)
             self.de4 = ChDecrease(2048, 4)
 
-        self.fore_pred = Pred_Fore_Rate(512, self.num_classes)
-
         self.up1 = Up(512, 768, 256)
         self.up2 = Up(256, 384, 128)
         self.up3 = Up(128, 192, 64)
@@ -160,8 +158,8 @@ class Dy_UNet(nn.Module):
             x4 = self.de4(x4)
         # print(x0.shape, x1.shape, x2.shape, x3.shape, x4.shape)
 
-        x4_ = x4.detach()
-        ratios = self.fore_pred(x4_).float()
+        # x4_ = x4.detach()
+        # ratios = self.fore_pred(x4_).float()
 
         x = self.up1(x4, x3)
         x = self.up2(x, x2)
@@ -171,7 +169,7 @@ class Dy_UNet(nn.Module):
 
         output = self.outconv(x)
 
-        return ratios, output
+        return output, x4
 
 
 # net = Boat_UNet(4, 16, 'resnet50')

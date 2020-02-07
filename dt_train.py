@@ -42,8 +42,13 @@ class Trainer:
                                      shuffle=False, num_workers=self.args.num_workers)
 
         # self.net = get_model(self.args.model_name, self.args.backbone, self.args.inplanes, 2).cuda()
-        self.net = get_model(self.args.model_name, self.args.backbone, self.args.inplanes, self.num_classes).cuda()
-
+        [self.net, self.ratio_net] = get_model(self.args.model_name, self.args.backbone, 
+                                             self.args.inplanes, self.num_classes)
+        self.net, self.ratio_net = self.net.cuda(), self.ratio_net.cuda()
+        self.switch = 1
+        self.feat_map = None
+        self.output = None
+        self.ratios = None
         # self.net = torch.load('/home/arron/Documents/grey/paper/model_saving/resnet50-resunet-bast_pred.pth')
 
         self.optimizer = torch.optim.SGD(self.net.parameters(), lr=self.args.lr, momentum=0.9)
@@ -91,27 +96,30 @@ class Trainer:
             if self.args.cuda:
                 img, tar, ratios = img.cuda(), tar.cuda(), ratios.cuda()
 
-            self.optimizer.zero_grad()
-            [output_ratios, output] = self.net(img)
+            if epoch % 20 == 0:
+                self.switch = -self.switch
+                print('switch net.')
 
-            loss1 = self.criterion1(output, tar.long())
-            loss2 = self.criterion2(output_ratios, ratios.float())
-            loss = loss1 + loss2
-            losses1.update(loss1)
-            losses2.update(loss2)
-            losses.update(loss)
+            if self.switch > 0:
+                self.optimizer.zero_grad()
+                [self.output, self.feat_map] = self.net(img)
+                loss = self.criterion1(self.output, tar.long())
+                losses1.update(loss)
+            else:
+                self.optimizer.zero_grad()
+                self.ratios = self.ratio_net(self.feat_map)
+                loss = self.criterion2(self.ratios, ratios.float())
+                losses2.update(loss)
 
-            output_tmp = output.permute(2, 3, 0, 1)
-            output_ratios = F.softmax(output_ratios, dim=1)
-            output_tmp = F.softmax(output_tmp, dim=1)
-            dynamic = output_tmp > (1 - output_ratios) / (self.num_classes - 1)
-            dynamic = dynamic.permute(2, 3, 0, 1)
-            output_tmp = output_tmp.permute(2, 3, 0, 1)
-            output = output_tmp * dynamic.float()
+            # loss = loss1 + loss2
 
-            self.train_metric.pixacc.update(output, tar)
-            self.train_metric.miou.update(output, tar)
-            self.train_metric.kappa.update(output, tar)
+                output_tmp = self.output.permute(2, 3, 0, 1)
+                self.ratios = F.softmax(self.ratios, dim=1)
+                output_tmp = F.softmax(output_tmp, dim=1)
+                dynamic = output_tmp > (1 - self.ratios) / (self.num_classes - 1)
+                dynamic = dynamic.permute(2, 3, 0, 1)
+                output_tmp = output_tmp.permute(2, 3, 0, 1)
+                self.output = output_tmp * dynamic.float()
 
             if self.args.apex:
                 with amp.scale_loss(loss, self.optimizer) as scale_loss:
@@ -120,16 +128,21 @@ class Trainer:
                 loss.backward()
             self.optimizer.step()
 
+            self.train_metric.pixacc.update(self.output, tar)
+            self.train_metric.miou.update(self.output, tar)
+            self.train_metric.kappa.update(self.output, tar)
+            losses.update(loss)
+
             batch_time.update(time.time() - starttime)
             starttime = time.time()
 
-            bar.suffix = '({batch}/{size}) Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss: {loss:.4f}, loss1: {loss1:.4f}, loss2: {loss2:.4f} | Acc: {Acc: .4f} | mIoU: {mIoU: .4f} | kappa: {kappa: .4f}'.format(
+            bar.suffix = '({batch}/{size}) Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | loss1: {loss1:.4f}, loss2: {loss2:.4f} | Acc: {Acc: .4f} | mIoU: {mIoU: .4f} | kappa: {kappa: .4f}'.format(
                 batch=idx + 1,
                 size=len(self.train_loader),
                 bt=batch_time.avg,
                 total=bar.elapsed_td,
                 eta=bar.eta_td,
-                loss=losses.avg,
+                # loss=losses.avg,
                 loss1=losses1.avg,
                 loss2=losses2.avg,
                 mIoU=self.train_metric.miou.get(),
@@ -154,7 +167,7 @@ class Trainer:
         batch_time = AverageMeter()
         losses1 = AverageMeter()
         losses2 = AverageMeter()
-        losses = AverageMeter()
+        # losses = AverageMeter()
         starttime = time.time()
 
         num_val = len(self.val_loader)
@@ -168,7 +181,8 @@ class Trainer:
             if self.args.cuda:
                 img, tar, ratios = img.cuda(), tar.cuda(), ratios.cuda()
             with torch.no_grad():
-                [output_ratios, output] = self.net(img)
+                [output, feat_map] = self.net(img)
+                output_ratios = self.ratio_net(feat_map)
 
             loss1 = self.criterion1(output, tar.long())
             loss2 = self.criterion2(output_ratios, ratios.float())
@@ -189,7 +203,7 @@ class Trainer:
             self.val_metric.miou.update(output, tar)
             self.val_metric.kappa.update(output, tar)
 
-            if idx % 5 == 0:
+            if idx % 20 == 0:
                 self.visualize_batch_image(img, tar, output, epoch, idx)
 
             batch_time.update(time.time() - starttime)
