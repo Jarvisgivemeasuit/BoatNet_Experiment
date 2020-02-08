@@ -59,7 +59,7 @@ class ResDown(nn.Module):
 class Pred_Fore_Rate(nn.Module):
     def __init__(self):
         super().__init__()
-        self.de_ratio = ChDecrease(512, 32)
+        self.de_ratio = ChDecrease(2048, 128)
         self.pool = nn.AdaptiveAvgPool2d(1)
         self.double_conv = Double_conv(16, 16)
 
@@ -152,6 +152,7 @@ class Dy_UNet(nn.Module):
     def forward(self, x):
         ori_x = x
         x0, x1, x2, x3, x4 = self.down(x)
+        ratios = self.fore_pred(x4).float()
 
         if self.backbone not in ['resnet18', 'resnet34']:
             x1 = self.de1(x1)
@@ -159,9 +160,6 @@ class Dy_UNet(nn.Module):
             x3 = self.de3(x3)
             x4 = self.de4(x4)
         # print(x0.shape, x1.shape, x2.shape, x3.shape, x4.shape)
-
-        # x4_ = x4.clone().detach().requires_grad_(True)
-        ratios = self.fore_pred(x4).float()
 
         x = self.up1(x4, x3)
         x = self.up2(x, x2)

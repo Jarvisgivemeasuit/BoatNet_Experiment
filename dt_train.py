@@ -88,7 +88,7 @@ class Trainer:
 
         self.net.train()
 
-        if epoch % 20 == 0:
+        if epoch % 2 == 0:
             self.switch = -self.switch
             print()
             print('switch training net.')
