@@ -139,6 +139,8 @@ class Dy_UNet(nn.Module):
             self.de3 = ChDecrease(1024, 4)
             self.de4 = ChDecrease(2048, 4)
 
+        self.fore_pred = Pred_Fore_Rate()
+
         self.up1 = Up(512, 768, 256)
         self.up2 = Up(256, 384, 128)
         self.up3 = Up(128, 192, 64)
@@ -158,8 +160,8 @@ class Dy_UNet(nn.Module):
             x4 = self.de4(x4)
         # print(x0.shape, x1.shape, x2.shape, x3.shape, x4.shape)
 
-        # x4_ = x4.detach()
-        # ratios = self.fore_pred(x4_).float()
+        # x4_ = x4.clone().detach().requires_grad_(True)
+        ratios = self.fore_pred(x4).float()
 
         x = self.up1(x4, x3)
         x = self.up2(x, x2)
@@ -169,16 +171,24 @@ class Dy_UNet(nn.Module):
 
         output = self.outconv(x)
 
-        return output, x4
+        return output, ratios
+        # return output, x4
+
+    def freeze_backbone(self):
+        for param in self.down.parameters():
+            param.requires_grad = False
+
+    def train_backbone(self):
+        for param in self.down.parameters():
+            param.requires_grad = True
 
 
 # net = Boat_UNet(4, 16, 'resnet50')
 # summary(net.cuda(), (4, 256, 256))
 
-# net = Boat_UNet(4, 16, 'resnet50', 'resnet18')
-# summary(net.cuda(), (4, 256, 256))
+# net = Pred_Fore_Rate().cuda()
+# summary(net.cuda(), (512, 16, 16))
 
-# net = Boat_UNet(4, 16, 'resnet50', 'resnet18').cuda()
-# test_data = torch.randn([2, 4, 256, 256]).cuda()
-# aa, bb, cc = net(test_data)
-# print(aa.shape, bb.shape, cc.shape)
+# test_data = torch.randn([2, 512, 16, 16], requires_grad=True).cuda()
+# aa = net(test_data)
+# print(aa.requires_grad)

@@ -1,6 +1,7 @@
 import os
 import time
 import sys
+import numpy as np
 
 from collections import namedtuple
 from progress.bar import Bar
@@ -46,15 +47,12 @@ class Trainer:
                                              self.args.inplanes, self.num_classes)
         self.net, self.ratio_net = self.net.cuda(), self.ratio_net.cuda()
         self.switch = 1
-        self.feat_map = None
-        self.output = None
-        self.ratios = None
         # self.net = torch.load('/home/arron/Documents/grey/paper/model_saving/resnet50-resunet-bast_pred.pth')
 
         self.optimizer = torch.optim.SGD(self.net.parameters(), lr=self.args.lr, momentum=0.9)
         if self.args.apex:
-            # self.net = self.net.module
             self.net, self.optimizer = amp.initialize(self.net, self.optimizer, opt_level='O1')
+
         self.net = nn.DataParallel(self.net, self.args.gpu_ids)
 
         self.criterion1 = torch.nn.CrossEntropyLoss().cuda()
@@ -90,47 +88,64 @@ class Trainer:
 
         self.net.train()
 
+        if epoch % 20 == 0:
+            self.switch = -self.switch
+            print()
+            print('switch training net.')
+
         for idx, sample in enumerate(self.train_loader):
             img, tar, ratios = sample['image'], sample['label'], sample['ratios']
 
             if self.args.cuda:
                 img, tar, ratios = img.cuda(), tar.cuda(), ratios.cuda()
 
-            if epoch % 20 == 0:
-                self.switch = -self.switch
-                print('switch net.')
-
             if self.switch > 0:
                 self.optimizer.zero_grad()
-                [self.output, self.feat_map] = self.net(img)
-                loss = self.criterion1(self.output, tar.long())
+                self.net.module.train_backbone()
+                [output, output_ratios] = self.net(img)
+                loss = self.criterion1(output, tar.long())
                 losses1.update(loss)
+
+                if self.args.apex:
+                    with amp.scale_loss(loss, self.optimizer) as scale_loss:
+                        scale_loss = scale_loss.half()
+                        scale_loss.backward()
+                else:
+                    loss.backward()
             else:
                 self.optimizer.zero_grad()
-                self.ratios = self.ratio_net(self.feat_map)
-                loss = self.criterion2(self.ratios, ratios.float())
+                self.net.module.freeze_backbone()
+                [output, output_ratios] = self.net(img)
+                loss = self.criterion2(output_ratios, ratios.float())
                 losses2.update(loss)
 
-            # loss = loss1 + loss2
+                if self.args.apex:
+                    with amp.scale_loss(loss, self.optimizer) as scale_loss:
+                        scale_loss = scale_loss.half()
+                        scale_loss.backward()
+                else:
+                    loss.backward()
 
-                output_tmp = self.output.permute(2, 3, 0, 1)
-                self.ratios = F.softmax(self.ratios, dim=1)
-                output_tmp = F.softmax(output_tmp, dim=1)
-                dynamic = output_tmp > (1 - self.ratios) / (self.num_classes - 1)
+                output_tmp = F.softmax(output, dim=1)
+                output_tmp = output_tmp.permute(2, 3, 0, 1)
+                output_ratios = F.softmax(output_ratios, dim=1)
+                dynamic = output_tmp > (1 - output_ratios) / (self.num_classes - 1)
                 dynamic = dynamic.permute(2, 3, 0, 1)
                 output_tmp = output_tmp.permute(2, 3, 0, 1)
-                self.output = output_tmp * dynamic.float()
+                output = output_tmp * dynamic.float()
 
-            if self.args.apex:
-                with amp.scale_loss(loss, self.optimizer) as scale_loss:
-                    scale_loss.backward()
-            else:
-                loss.backward()
+
+            # if self.args.apex:
+            #     with amp.scale_loss(loss, self.optimizer) as scale_loss:
+            #         scale_loss = scale_loss.half()
+            #         scale_loss.backward()
+            # else:
+            #     loss.backward()
             self.optimizer.step()
 
-            self.train_metric.pixacc.update(self.output, tar)
-            self.train_metric.miou.update(self.output, tar)
-            self.train_metric.kappa.update(self.output, tar)
+            self.train_metric.pixacc.update(output, tar)
+            self.train_metric.miou.update(output, tar)
+            self.train_metric.kappa.update(output, tar)
             losses.update(loss)
 
             batch_time.update(time.time() - starttime)
@@ -167,13 +182,14 @@ class Trainer:
         batch_time = AverageMeter()
         losses1 = AverageMeter()
         losses2 = AverageMeter()
-        # losses = AverageMeter()
+        losses = AverageMeter()
         starttime = time.time()
 
         num_val = len(self.val_loader)
         bar = Bar('Validation', max=num_val)
 
         self.net.eval()
+        self.ratio_net.eval()
 
         for idx, sample in enumerate(self.val_loader):
             img, tar, ratios = sample['image'], sample['label'], sample['ratios']
@@ -181,8 +197,7 @@ class Trainer:
             if self.args.cuda:
                 img, tar, ratios = img.cuda(), tar.cuda(), ratios.cuda()
             with torch.no_grad():
-                [output, feat_map] = self.net(img)
-                output_ratios = self.ratio_net(feat_map)
+                [output, output_ratios] = self.net(img)
 
             loss1 = self.criterion1(output, tar.long())
             loss2 = self.criterion2(output_ratios, ratios.float())
@@ -191,9 +206,9 @@ class Trainer:
             losses2.update(loss2)
             losses.update(loss)
 
+            output_tmp = F.softmax(output, dim=1)
             output_tmp = output.permute(2, 3, 0, 1)
             output_ratios = F.softmax(output_ratios, dim=1)
-            output_tmp = F.softmax(output_tmp, dim=1)
             dynamic = output_tmp > (1 - output_ratios) / (self.num_classes - 1)
             dynamic = dynamic.permute(2, 3, 0, 1)
             output_tmp = output_tmp.permute(2, 3, 0, 1)

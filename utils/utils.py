@@ -79,13 +79,16 @@ def get_labels(label_number):
                          [0, 200, 250],
                          [0, 0, 0]])
 
+
     label_colors = {19: label_19, 21: label_21, 16: label_16}
     return label_colors[label_number]
+
 
 def make_dataset():
     train_set = rssrai2.Rssrai(mode='train')
     val_set = rssrai2.Rssrai(mode='val')
     return train_set, val_set, train_set.NUM_CLASSES
+
 
 def decode_segmap(label_mask, label_number):
     """Decode segmentation class labels into a color image
@@ -106,11 +109,13 @@ def decode_segmap(label_mask, label_number):
     rgb[:, :, 2] = b
     return rgb.astype(np.uint8)
 
+
 def make_sure_path_exists(path):
     if not os.path.exists(path):
         os.makedirs(path)
     return path
-    
+
+
 class AverageMeter:
     def __init__(self):
         self.count = 0
@@ -246,7 +251,7 @@ class SuperMerger:
             res_img.save(os.path.join(final_path, ori_img_file))
 
             print(f"{ori_img_name} merge complete.")
-    
+
     # 找出有多少张output可以组成一张原始图片
     def find_max_index(self):
         img_list = os.listdir(self.res_path)
@@ -259,7 +264,7 @@ class SuperMerger:
                 xs.append(int(x))
                 ys.append(int(y))
         return max(xs), max(ys)
-            
+
     def get_image_message(self, img_file):
         # print(img_file)
         split_tmp = img_file.split('_')[-2:]
