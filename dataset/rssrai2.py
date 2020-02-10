@@ -42,7 +42,7 @@ class Rssrai(Dataset):
             self.len = len(self._data_list)
 
         if self._mode == 'test':
-            self._image_dir = os.path.join(self._base_dir, 'test_split_256')
+            self._image_dir = os.path.join(self._base_dir, 'test_split_256', 'img')
             self._data_list = os.listdir(self._image_dir)
             self.len = len(self._data_list)
 

@@ -7,6 +7,7 @@ from collections import namedtuple
 from progress.bar import Bar
 from apex import amp
 from PIL import Image
+from pprint import pprint
 
 sys.path.append("/home/arron/Documents/grey/paper/")
 
@@ -55,9 +56,10 @@ class Trainer:
 
         self.net = nn.DataParallel(self.net, self.args.gpu_ids)
 
-        self.criterion1 = torch.nn.CrossEntropyLoss().cuda()
+        self.criterion1 = nn.CrossEntropyLoss().cuda()
         # self.criterion1 = FocalLoss().cuda()
-        self.criterion2 = SoftCrossEntropyLoss().cuda()
+        self.criterion2 = nn.MSELoss().cuda()
+        # self.criterion2 = SoftCrossEntropyLoss().cuda()
         self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, [20, 40, 60, 100], 0.3)
         # self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, mode='min', factor=0.3, patience=3)
         
@@ -88,10 +90,16 @@ class Trainer:
 
         self.net.train()
 
-        if epoch % 2 == 0:
-            self.switch = -self.switch
-            print()
-            print('switch training net.')
+        # if epoch % 2 == 0:
+        #     self.switch = -self.switch
+        #     print()
+        #     print('switch training net.')
+
+        if epoch == 2:
+                self.switch = -self.switch
+                print('switch training net.')
+        else:
+            self.switch = 1
 
         for idx, sample in enumerate(self.train_loader):
             img, tar, ratios = sample['image'], sample['label'], sample['ratios']
@@ -103,6 +111,7 @@ class Trainer:
                 self.optimizer.zero_grad()
                 self.net.module.train_backbone()
                 [output, output_ratios] = self.net(img)
+                # losses2.update(self.criterion2(output_ratios, ratios.float()))
                 loss = self.criterion1(output, tar.long())
                 losses1.update(loss)
 
@@ -112,10 +121,13 @@ class Trainer:
                         scale_loss.backward()
                 else:
                     loss.backward()
+
+                output = F.softmax(output, dim=1)
             else:
                 self.optimizer.zero_grad()
                 self.net.module.freeze_backbone()
                 [output, output_ratios] = self.net(img)
+                # losses1.update(self.criterion1(output, tar.long()))
                 loss = self.criterion2(output_ratios, ratios.float())
                 losses2.update(loss)
 
@@ -127,6 +139,7 @@ class Trainer:
                     loss.backward()
 
                 output_tmp = F.softmax(output, dim=1)
+                # pprint(output_tmp[0, :, 1, 1])
                 output_tmp = output_tmp.permute(2, 3, 0, 1)
                 output_ratios = F.softmax(output_ratios, dim=1)
                 dynamic = output_tmp > (1 - output_ratios) / (self.num_classes - 1)
@@ -134,6 +147,15 @@ class Trainer:
                 output_tmp = output_tmp.permute(2, 3, 0, 1)
                 output = output_tmp * dynamic.float()
 
+            if epoch > 2:
+                output_tmp = F.softmax(output, dim=1)
+                # pprint(output_tmp[0, :, 1, 1])
+                output_tmp = output_tmp.permute(2, 3, 0, 1)
+                output_ratios = F.softmax(output_ratios, dim=1)
+                dynamic = output_tmp > (1 - output_ratios) / (self.num_classes - 1)
+                dynamic = dynamic.permute(2, 3, 0, 1)
+                output_tmp = output_tmp.permute(2, 3, 0, 1)
+                output = output_tmp * dynamic.float()
 
             # if self.args.apex:
             #     with amp.scale_loss(loss, self.optimizer) as scale_loss:

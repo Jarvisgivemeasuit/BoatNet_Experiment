@@ -321,12 +321,12 @@ class FocalLoss(nn.Module):
 
 
 if __name__ == '__main__':
-    path = '/home/arron/dataset/rssrai_grey/rssrai/test'
-    save_path = '/home/arron/dataset/rssrai_grey/results/resunet-resnet50' 
-    res_path = '/home/arron/dataset/rssrai_grey/results/tmp_output/resunet-resnet50'
+    path = '/home/arron/dataset/rssrai_grey/rssrai/train/img'
+    save_path = '/home/arron/dataset/rssrai_grey/results/dt_resunet-resnet50' 
+    res_path = '/home/arron/dataset/rssrai_grey/results/tmp_output/dt_resunet-resnet50'
     supermerger = SuperMerger(path, res_path, save_path)
-    supermerger.merge_image()
     # print(supermerger.ori_list)
+    supermerger.merge_image()
 
 
     # lists = os.listdir(res_path)

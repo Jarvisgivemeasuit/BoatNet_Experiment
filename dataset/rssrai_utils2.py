@@ -515,9 +515,14 @@ if __name__ == '__main__':
     # spliter_paths['save_path'] = paths_dict['test_split_256']
     # spliter_paths['img_format'] = '.tif'
 
+    spliter_paths = {}
+    spliter_paths['data_path'] = os.path.join(paths_dict['ori_path'], 'img')
+    spliter_paths['save_path'] = '/home/arron/dataset/rssrai_grey/increase/test_split_256/img'
+    spliter_paths['img_format'] = '.tif'
+
     # spliter = ImageSpliter(spliter_paths)
-    # spliter = TestImageSpliter(spliter_paths)
-    # spliter.split_image()
+    spliter = TestImageSpliter(spliter_paths)
+    spliter.split_image()
 
     # spliter_paths = {}
     # spliter_paths['data_path'] = paths_dict['ori_path']
@@ -549,8 +554,8 @@ if __name__ == '__main__':
     # save_label_map(transpose_paths)
 
 
-    binary_paths = {}
-    binary_paths['data_path'] = os.path.join(paths_dict['val_split_256'], 'mask')
-    binary_paths['save_path'] = os.path.join(paths_dict['val_split_256'], 'ratios')
+    # binary_paths = {}
+    # binary_paths['data_path'] = os.path.join(paths_dict['val_split_256'], 'mask')
+    # binary_paths['save_path'] = os.path.join(paths_dict['val_split_256'], 'ratios')
     
-    multi_fore_back_ratios(binary_paths)
+    # multi_fore_back_ratios(binary_paths)
