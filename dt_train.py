@@ -43,10 +43,8 @@ class Trainer:
         self.val_loader = DataLoader(val_set, batch_size=self.args.vd_batch_size,
                                      shuffle=False, num_workers=self.args.num_workers)
 
-        # self.net = get_model(self.args.model_name, self.args.backbone, self.args.inplanes, 2).cuda()
-        [self.net, self.ratio_net] = get_model(self.args.model_name, self.args.backbone, 
-                                             self.args.inplanes, self.num_classes)
-        self.net, self.ratio_net = self.net.cuda(), self.ratio_net.cuda()
+        self.net = get_model(self.args.model_name, self.args.backbone, 
+                                             self.args.inplanes, self.num_classes).cuda()
         self.switch = 1
         # self.net = torch.load('/home/arron/Documents/grey/paper/model_saving/resnet50-resunet-bast_pred.pth')
 
@@ -58,8 +56,8 @@ class Trainer:
 
         self.criterion1 = nn.CrossEntropyLoss().cuda()
         # self.criterion1 = FocalLoss().cuda()
-        self.criterion2 = nn.MSELoss().cuda()
-        # self.criterion2 = SoftCrossEntropyLoss().cuda()
+        # self.criterion2 = nn.MSELoss().cuda()
+        self.criterion2 = SoftCrossEntropyLoss().cuda()
         self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, [20, 40, 60, 100], 0.3)
         # self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, mode='min', factor=0.3, patience=3)
         
@@ -90,14 +88,10 @@ class Trainer:
 
         self.net.train()
 
-        # if epoch % 2 == 0:
-        #     self.switch = -self.switch
-        #     print()
-        #     print('switch training net.')
-
-        if epoch == 2:
-                self.switch = -self.switch
-                print('switch training net.')
+        if epoch % 10 == 0:
+            self.switch = -1
+            print()
+            print('switch training net.')
         else:
             self.switch = 1
 
@@ -138,24 +132,24 @@ class Trainer:
                 else:
                     loss.backward()
 
-                output_tmp = F.softmax(output, dim=1)
-                # pprint(output_tmp[0, :, 1, 1])
-                output_tmp = output_tmp.permute(2, 3, 0, 1)
-                output_ratios = F.softmax(output_ratios, dim=1)
-                dynamic = output_tmp > (1 - output_ratios) / (self.num_classes - 1)
-                dynamic = dynamic.permute(2, 3, 0, 1)
-                output_tmp = output_tmp.permute(2, 3, 0, 1)
-                output = output_tmp * dynamic.float()
+                # output_tmp = F.softmax(output, dim=1)
+                # # pprint(output_tmp[0, :, 1, 1])
+                # output_tmp = output_tmp.permute(2, 3, 0, 1)
+                # output_ratios = F.softmax(output_ratios, dim=1)
+                # dynamic = output_tmp > (1 - output_ratios) / (self.num_classes - 1)
+                # dynamic = dynamic.permute(2, 3, 0, 1)
+                # output_tmp = output_tmp.permute(2, 3, 0, 1)
+                # output = output_tmp * dynamic.float()
 
-            if epoch > 2:
-                output_tmp = F.softmax(output, dim=1)
-                # pprint(output_tmp[0, :, 1, 1])
-                output_tmp = output_tmp.permute(2, 3, 0, 1)
-                output_ratios = F.softmax(output_ratios, dim=1)
-                dynamic = output_tmp > (1 - output_ratios) / (self.num_classes - 1)
-                dynamic = dynamic.permute(2, 3, 0, 1)
-                output_tmp = output_tmp.permute(2, 3, 0, 1)
-                output = output_tmp * dynamic.float()
+            # if epoch > 2:
+            output_tmp = F.softmax(output, dim=1)
+            # pprint(output_tmp[0, :, 1, 1])
+            output_tmp = output_tmp.permute(2, 3, 0, 1)
+            output_ratios = F.softmax(output_ratios, dim=1)
+            dynamic = output_tmp > (1 - output_ratios) / (self.num_classes - 1)
+            dynamic = dynamic.permute(2, 3, 0, 1)
+            output_tmp = output_tmp.permute(2, 3, 0, 1)
+            output = output_tmp * dynamic.float()
 
             # if self.args.apex:
             #     with amp.scale_loss(loss, self.optimizer) as scale_loss:
@@ -193,7 +187,7 @@ class Trainer:
         if self.train_metric.pixacc.get() > self.best_pred and self.train_metric.miou.get() > self.best_miou:
             self.best_pred = self.train_metric.pixacc.get()
             self.best_miou = self.train_metric.miou.get()
-            save_model(self.net, self.args.model_name, 'resnet50')
+            save_model(self.net, self.args.model_name, 'resnet50', '0210')
 
     def validation(self, epoch):
 
@@ -211,7 +205,6 @@ class Trainer:
         bar = Bar('Validation', max=num_val)
 
         self.net.eval()
-        self.ratio_net.eval()
 
         for idx, sample in enumerate(self.val_loader):
             img, tar, ratios = sample['image'], sample['label'], sample['ratios']
@@ -240,7 +233,7 @@ class Trainer:
             self.val_metric.miou.update(output, tar)
             self.val_metric.kappa.update(output, tar)
 
-            if idx % 20 == 0:
+            if idx % 5 == 0:
                 self.visualize_batch_image(img, tar, output, epoch, idx)
 
             batch_time.update(time.time() - starttime)
@@ -260,6 +253,10 @@ class Trainer:
                 kappa=self.val_metric.kappa.get()
             )
             bar.next()
+            if idx + 1 == len(self.val_loader):
+                print()
+                pprint(output_ratios[0])
+                pprint(ratios[0])
         bar.finish()
 
         new_pred = self.val_metric.miou.get()

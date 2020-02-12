@@ -60,12 +60,20 @@ class Pred_Fore_Rate(nn.Module):
     def __init__(self):
         super().__init__()
         self.de_ratio = ChDecrease(2048, 128)
+        # self.double_conv = Double_conv(16, 16)
+        self.conv = nn.Sequential(
+            nn.Conv2d(16, 16, 3, stride=2, padding=1),
+            nn.BatchNorm2d(16),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(16, 16, 3, stride=2, padding=1),
+            nn.BatchNorm2d(16),
+            nn.ReLU(inplace=True)
+        )
         self.pool = nn.AdaptiveAvgPool2d(1)
-        self.double_conv = Double_conv(16, 16)
 
     def forward(self, x):
         x = self.de_ratio(x)
-        x = self.double_conv(x)
+        x = self.conv(x)
         x = self.pool(x)
         x = x.reshape(x.shape[0], x.shape[1])
 

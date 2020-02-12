@@ -47,6 +47,7 @@ class Tester:
                 img = img.float().cuda()
             with torch.no_grad():
                 [output, output_ratios] = self.net(img)
+                # output = self.net(img)
 
             final_save_path = make_sure_path_exists(os.path.join(save_path, f"{self.args.model_name}-{self.args.backbone}"))
 

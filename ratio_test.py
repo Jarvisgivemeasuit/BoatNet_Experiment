@@ -6,6 +6,8 @@ from collections import namedtuple
 from progress.bar import Bar
 from apex import amp
 from PIL import Image
+from pprint import pprint
+import random
 
 sys.path.append("/home/arron/Documents/grey/paper/")
 
@@ -20,6 +22,7 @@ from experiment.dataset.rssrai2 import Rssrai
 import torch
 from torch import nn
 from torch.autograd import Variable
+import torch.nn.functional as F
 import torch.utils.data
 from torch.utils.data import DataLoader
 import torch.optim
@@ -42,10 +45,11 @@ class Trainer:
         self.val_loader = DataLoader(val_set, batch_size=self.args.vd_batch_size,
                                      shuffle=False, num_workers=self.args.num_workers)
 
-        # self.net = Boat_UNet_Part1(self.args.inplanes, 16, self.args.backbone).cuda()
-        self.net = UNet(self.args.inplanes, 2, self.args.backbone).cuda()
-        
-        self.conv = nn.Conv2d(512, 2, 1).cuda()
+        self.net = ResDown(in_channels=4).cuda()
+
+        self.conv = nn.Sequential(nn.Conv2d(2048, 16, 1),
+                                  nn.Conv2d(16, 16, 3, 1),
+                                  nn.Conv2d(16, 16, 3, 1)).cuda()
         self.pool = nn.AdaptiveAvgPool2d(1)
         self.softmax = nn.Softmax().cuda()
         
@@ -55,9 +59,8 @@ class Trainer:
             self.net, self.optimizer = amp.initialize(self.net, self.optimizer, opt_level='O1')
         self.net = nn.DataParallel(self.net, self.args.gpu_ids)
 
-        self.criterion0 = SoftCrossEntropyLoss().cuda()
-        self.criterion1 = FocalLoss().cuda()
-        # self.criterion1 = nn.CrossEntropyLoss().cuda()
+        self.criterion = SoftCrossEntropyLoss().cuda()
+        # self.criterion = nn.CrossEntropyLoss().cuda()
 
         self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, mode='min', factor=0.1, patience=4)
 
@@ -71,14 +74,10 @@ class Trainer:
                                         kappa=metrics.Kappa(self.num_classes))
 
     def training(self, epoch):
-
         batch_time = AverageMeter()
-        losses1 = AverageMeter()
-        losses2 = AverageMeter()
         losses = AverageMeter()
-        
+
         self.train_metric.pixacc.reset()
-        self.train_metric.miou.reset()
         starttime = time.time()
 
         num_train = len(self.train_loader)
@@ -87,31 +86,21 @@ class Trainer:
         self.net.train()
 
         for idx, sample in enumerate(self.train_loader):
-            img, tar, bmask, rate = sample['image'], sample['label'], sample['binary_mask'], sample['ratios']
+            img, ratios = sample['image'], sample['ratios']
             if self.args.cuda:
-                img, tar, bmask, rate = img.cuda(), tar.cuda(), bmask.cuda(), rate.cuda()
+                img, ratios = img.cuda(), ratios.cuda()
 
             self.optimizer.zero_grad()
-            # fg_mask, pred_rate = self.net(img)[:2]
-            fg_mask = self.net(img)
-            # pred_rate = self.conv(pred_rate)
-            # pred_rate = self.pool(pred_rate)
-            # pred_rate = pred_rate.reshape(pred_rate.shape[0], 2)
+            _1, _2, _3, _4, feat_map = self.net(img)
+            feat_map = self.conv(feat_map)
+            output = self.pool(feat_map)
+            output = output.reshape(output.shape[0], output.shape[1])
+            output = F.softmax(output, dim=1)
 
-            # loss1 = self.criterion0(pred_rate, rate.float())
-            loss1 = 0
-            # print(fg_mask.shape, bmask.shape)
-            loss2 = self.criterion1(fg_mask, bmask.long())
-            # loss = abs((pred_rate - rate.float())).sum() / self.args.tr_batch_size
-            loss = loss2
-
-            losses1.update(loss1)
-            losses2.update(loss2)
+            loss = self.criterion(output, ratios.float())
             losses.update(loss)
+            # self.train_metric.pixacc.update(output, ratios)
 
-            self.train_metric.pixacc.update(fg_mask, bmask)
-            self.train_metric.miou.update(fg_mask, bmask)
-            
             if self.args.apex:
                 with amp.scale_loss(loss, self.optimizer) as scale_loss:
                     scale_loss.backward()
@@ -122,27 +111,17 @@ class Trainer:
             batch_time.update(time.time() - starttime)
             starttime = time.time()
 
-            bar.suffix = '({batch}/{size}) Batch: {bt:.2f}s, Total:{total:}, ETA:{eta:}, Loss:{loss1:.4f}, {loss2:.4f}, Acc:{Acc:.4f}, mIoU:{mIoU:.4f}, EG:{pred:.4f}, {tar:.4f}'.format(
+            bar.suffix = '({batch}/{size}) Batch: {bt:.2f}s, Total:{total:}, ETA:{eta:}, Loss:{loss:.4f}, Acc:{Acc:.4f}'.format(
                 batch=idx + 1,
                 size=num_train,
                 bt=batch_time.avg,
                 total=bar.elapsed_td,
                 eta=bar.eta_td,
-                loss1=losses1.avg,
-                loss2=losses2.avg,
+                loss=losses.avg,
                 mIoU=self.train_metric.miou.get(),
                 Acc=self.train_metric.pixacc.get(),
-                # pred=self.softmax(pred_rate[0]).tolist()[0],
-                pred=0,
-                tar=rate[0].tolist()[0]
             )
             bar.next()
-
-            # if idx == num_train - 1:
-            #     print()
-            #     print(self.softmax(pred_rate[0]).tolist())
-            #     print(rate[0].tolist())
-
         bar.finish()
 
         print('[Epoch: %d, numImages: %5d]' % (epoch, num_train * self.args.tr_batch_size))
@@ -150,12 +129,9 @@ class Trainer:
 
     def validation(self, epoch):
         batch_time = AverageMeter()
-        losses1 = AverageMeter()
-        losses2 = AverageMeter()
         losses = AverageMeter()
-        
+
         self.val_metric.pixacc.reset()
-        self.val_metric.miou.reset()
         starttime = time.time()
 
         num_valid = len(self.val_loader)
@@ -164,46 +140,40 @@ class Trainer:
         self.net.eval()
 
         for idx, sample in enumerate(self.val_loader):
-            img, tar, bmask, rate = sample['image'], sample['label'], sample['binary_mask'], sample['ratios']
+            img, ratios = sample['image'], sample['ratios']
             if self.args.cuda:
-                img, tar, bmask, rate = img.cuda(), tar.cuda(), bmask.cuda(), rate.cuda()
+                img, ratios = img.cuda(), ratios.cuda()
 
             with torch.no_grad():
-                # fg_mask, pred_rate = self.net(img)[:2]
-                fg_mask = self.net(img)
+                _1, _2, _3, _4, feat_map = self.net(img)
+                feat_map = self.conv(feat_map)
+                output = self.pool(feat_map)
+                output = output.reshape(output.shape[0], output.shape[1])
+                output = F.softmax(output, dim=1)
 
-            # loss1 = self.criterion0(pred_rate, rate.float())
-            loss1 = 0
-            loss2 = self.criterion1(fg_mask, bmask.long())
-            # loss = abs((pred_rate - rate.float())).sum() / self.args.tr_batch_size
-            loss = loss2
-
-            losses1.update(loss1)
-            losses2.update(loss2)
+            loss = self.criterion(output, ratios.float())
             losses.update(loss)
-
-            self.val_metric.pixacc.update(fg_mask, bmask)
-            self.val_metric.miou.update(fg_mask, bmask)
+            # self.val_metric.pixacc.update(output, ratios)
 
             batch_time.update(time.time() - starttime)
             starttime = time.time()
 
-            bar.suffix = '({batch}/{size}) Batch: {bt:.2f}s, Total:{total:}, ETA:{eta:}, Loss:{loss1:.4f}, {loss2:.4f}, Acc:{Acc:.4f}, mIoU:{mIoU:.4f}, EG:{pred:.4f}, {tar:.4f}'.format(
+            bar.suffix = '({batch}/{size}) Batch: {bt:.2f}s, Total:{total:}, ETA:{eta:}, Loss:{loss:.4f}, Acc:{Acc:.4f}'.format(
                 batch=idx + 1,
                 size=num_valid,
                 bt=batch_time.avg,
                 total=bar.elapsed_td,
                 eta=bar.eta_td,
-                loss1=losses1.avg,
-                loss2=losses2.avg,
+                loss=losses.avg,
                 mIoU=self.val_metric.miou.get(),
                 Acc=self.val_metric.pixacc.get(),
-                # pred=self.softmax(pred_rate[0]).tolist()[0],
-                pred=0,
-                tar=rate[0].tolist()[0]
             )
             bar.next()
-
+            if idx + 1 == len(self.val_loader):
+                index = random.randint(0, 32)
+                print()
+                pprint(output[index])
+                pprint(ratios[index])
         bar.finish()
 
         print('[Epoch: %d, numImages: %5d]' % (epoch, num_valid * self.args.tr_batch_size))
