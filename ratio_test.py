@@ -14,7 +14,7 @@ sys.path.append("/home/arron/Documents/grey/paper/")
 from experiment.utils import metrics
 from experiment.utils.args import Args
 from experiment.utils.utils import *
-from experiment.model.resunet.resunet import UNet
+from experiment.model.resunet.resunet import UNet, RatioNet
 from experiment.model.boat_resunet.boat_resunet import *
 from experiment.model import get_model, save_model
 from experiment.dataset.rssrai2 import Rssrai
@@ -45,14 +45,7 @@ class Trainer:
         self.val_loader = DataLoader(val_set, batch_size=self.args.vd_batch_size,
                                      shuffle=False, num_workers=self.args.num_workers)
 
-        self.net = ResDown(in_channels=4).cuda()
-
-        self.conv = nn.Sequential(nn.Conv2d(2048, 16, 1),
-                                  nn.Conv2d(16, 16, 3, 1),
-                                  nn.Conv2d(16, 16, 3, 1)).cuda()
-        self.pool = nn.AdaptiveAvgPool2d(1)
-        self.softmax = nn.Softmax().cuda()
-        
+        self.net = RatioNet().cuda()
         self.optimizer = torch.optim.Adam(self.net.parameters(), lr=self.args.lr)
 
         if self.args.apex:
@@ -60,7 +53,7 @@ class Trainer:
         self.net = nn.DataParallel(self.net, self.args.gpu_ids)
 
         self.criterion = SoftCrossEntropyLoss().cuda()
-        # self.criterion = nn.CrossEntropyLoss().cuda()
+        # self.criterion = nn.MSELoss().cuda()
 
         self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, mode='min', factor=0.1, patience=4)
 
@@ -91,11 +84,8 @@ class Trainer:
                 img, ratios = img.cuda(), ratios.cuda()
 
             self.optimizer.zero_grad()
-            _1, _2, _3, _4, feat_map = self.net(img)
-            feat_map = self.conv(feat_map)
-            output = self.pool(feat_map)
+            output = self.net(img)
             output = output.reshape(output.shape[0], output.shape[1])
-            output = F.softmax(output, dim=1)
 
             loss = self.criterion(output, ratios.float())
             losses.update(loss)
@@ -145,11 +135,8 @@ class Trainer:
                 img, ratios = img.cuda(), ratios.cuda()
 
             with torch.no_grad():
-                _1, _2, _3, _4, feat_map = self.net(img)
-                feat_map = self.conv(feat_map)
-                output = self.pool(feat_map)
+                output = self.net(img)
                 output = output.reshape(output.shape[0], output.shape[1])
-                output = F.softmax(output, dim=1)
 
             loss = self.criterion(output, ratios.float())
             losses.update(loss)
@@ -171,6 +158,7 @@ class Trainer:
             bar.next()
             if idx + 1 == len(self.val_loader):
                 index = random.randint(0, 32)
+                output = F.softmax(output, dim=1)
                 print()
                 pprint(output[index])
                 pprint(ratios[index])

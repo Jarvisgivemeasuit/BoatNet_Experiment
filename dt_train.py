@@ -88,12 +88,12 @@ class Trainer:
 
         self.net.train()
 
-        if epoch % 10 == 0:
-            self.switch = -1
-            print()
-            print('switch training net.')
-        else:
-            self.switch = 1
+        # if epoch % 10 == 0:
+        #     self.switch = -1
+        #     print()
+        #     print('switch training net.')
+        # else:
+        #     self.switch = 1
 
         for idx, sample in enumerate(self.train_loader):
             img, tar, ratios = sample['image'], sample['label'], sample['ratios']
@@ -101,49 +101,42 @@ class Trainer:
             if self.args.cuda:
                 img, tar, ratios = img.cuda(), tar.cuda(), ratios.cuda()
 
-            if self.switch > 0:
-                self.optimizer.zero_grad()
-                self.net.module.train_backbone()
-                [output, output_ratios] = self.net(img)
-                # losses2.update(self.criterion2(output_ratios, ratios.float()))
-                loss = self.criterion1(output, tar.long())
-                losses1.update(loss)
+            # if self.switch > 0:
+            #     self.optimizer.zero_grad()
+            #     self.net.module.train_backbone()
+            #     [output, output_ratios] = self.net(img)
+            #     # losses2.update(self.criterion2(output_ratios, ratios.float()))
+            #     loss = self.criterion1(output, tar.long())
+            #     losses1.update(loss)
 
-                if self.args.apex:
-                    with amp.scale_loss(loss, self.optimizer) as scale_loss:
-                        scale_loss = scale_loss.half()
-                        scale_loss.backward()
-                else:
-                    loss.backward()
+            #     if self.args.apex:
+            #         with amp.scale_loss(loss, self.optimizer) as scale_loss:
+            #             scale_loss = scale_loss.half()
+            #             scale_loss.backward()
+            #     else:
+            #         loss.backward()
 
-                output = F.softmax(output, dim=1)
+            #     output = F.softmax(output, dim=1)
+            # else:
+            self.optimizer.zero_grad()
+            # self.net.module.freeze_backbone()
+            [output, output_ratios] = self.net(img)
+            loss1 = self.criterion1(output, tar.long())
+            loss2 = self.criterion2(output_ratios, ratios.float())
+            loss = loss1 + loss2
+            losses1.update(loss1)
+            losses2.update(loss2)
+            losses.update(loss)
+
+            if self.args.apex:
+                with amp.scale_loss(loss, self.optimizer) as scale_loss:
+                    scale_loss = scale_loss.half()
+                    scale_loss.backward()
             else:
-                self.optimizer.zero_grad()
-                self.net.module.freeze_backbone()
-                [output, output_ratios] = self.net(img)
-                # losses1.update(self.criterion1(output, tar.long()))
-                loss = self.criterion2(output_ratios, ratios.float())
-                losses2.update(loss)
-
-                if self.args.apex:
-                    with amp.scale_loss(loss, self.optimizer) as scale_loss:
-                        scale_loss = scale_loss.half()
-                        scale_loss.backward()
-                else:
-                    loss.backward()
-
-                # output_tmp = F.softmax(output, dim=1)
-                # # pprint(output_tmp[0, :, 1, 1])
-                # output_tmp = output_tmp.permute(2, 3, 0, 1)
-                # output_ratios = F.softmax(output_ratios, dim=1)
-                # dynamic = output_tmp > (1 - output_ratios) / (self.num_classes - 1)
-                # dynamic = dynamic.permute(2, 3, 0, 1)
-                # output_tmp = output_tmp.permute(2, 3, 0, 1)
-                # output = output_tmp * dynamic.float()
+                loss.backward()
 
             # if epoch > 2:
             output_tmp = F.softmax(output, dim=1)
-            # pprint(output_tmp[0, :, 1, 1])
             output_tmp = output_tmp.permute(2, 3, 0, 1)
             output_ratios = F.softmax(output_ratios, dim=1)
             dynamic = output_tmp > (1 - output_ratios) / (self.num_classes - 1)
@@ -167,13 +160,13 @@ class Trainer:
             batch_time.update(time.time() - starttime)
             starttime = time.time()
 
-            bar.suffix = '({batch}/{size}) Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | loss1: {loss1:.4f}, loss2: {loss2:.4f} | Acc: {Acc: .4f} | mIoU: {mIoU: .4f} | kappa: {kappa: .4f}'.format(
+            bar.suffix = '({batch}/{size}) Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss:{loss:.4f},loss1:{loss1:.4f},loss2:{loss2:.4f} | Acc: {Acc: .4f} | mIoU: {mIoU: .4f} | kappa: {kappa: .4f}'.format(
                 batch=idx + 1,
                 size=len(self.train_loader),
                 bt=batch_time.avg,
                 total=bar.elapsed_td,
                 eta=bar.eta_td,
-                # loss=losses.avg,
+                loss=losses.avg,
                 loss1=losses1.avg,
                 loss2=losses2.avg,
                 mIoU=self.train_metric.miou.get(),

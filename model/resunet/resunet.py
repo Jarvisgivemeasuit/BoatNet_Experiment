@@ -50,6 +50,7 @@ class ResDown(nn.Module):
         output4 = self.layer4(x)
 
         return output0, output1, output2, output3, output4
+        # return output4
 
 
 class Double_conv(nn.Module):
@@ -138,3 +139,19 @@ class UNet(nn.Module):
         x = self.outconv(x)
 
         return x
+
+
+class RatioNet(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.down = ResDown(in_channels=4)
+        self.conv = nn.Sequential(nn.Conv2d(2048, 16, 1),
+                                  nn.Conv2d(16, 16, 3, 1),
+                                  nn.Conv2d(16, 16, 3, 1))
+        self.pool = nn.AdaptiveAvgPool2d(1)
+
+    def forward(self, x):
+        _1, _2, _3, _4, output = self.down(x)
+        output = self.conv(output)
+        output = self.pool(output)
+        return output

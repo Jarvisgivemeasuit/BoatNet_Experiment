@@ -3,17 +3,17 @@ import os
 class Args:
 
     def __init__(self):
-        self.tr_batch_size = 32
+        self.tr_batch_size = 16
         self.vd_batch_size = 32
         self.num_workers = 8
         self.inplanes = 4
 
-        self.model_name = 'resunet'
+        self.model_name = 'dt_resunet'
         self.backbone = 'resnet50'
         self.annotations = 'deconv-deconv'
 
         self.epochs = 150
-        self.lr = 0.1
+        self.lr = 0.03
         self.no_val = False
 
         self.gpu_ids = [0, 1]
