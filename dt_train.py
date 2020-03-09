@@ -88,36 +88,12 @@ class Trainer:
 
         self.net.train()
 
-        # if epoch % 10 == 0:
-        #     self.switch = -1
-        #     print()
-        #     print('switch training net.')
-        # else:
-        #     self.switch = 1
-
         for idx, sample in enumerate(self.train_loader):
             img, tar, ratios = sample['image'], sample['label'], sample['ratios']
 
             if self.args.cuda:
                 img, tar, ratios = img.cuda(), tar.cuda(), ratios.cuda()
 
-            # if self.switch > 0:
-            #     self.optimizer.zero_grad()
-            #     self.net.module.train_backbone()
-            #     [output, output_ratios] = self.net(img)
-            #     # losses2.update(self.criterion2(output_ratios, ratios.float()))
-            #     loss = self.criterion1(output, tar.long())
-            #     losses1.update(loss)
-
-            #     if self.args.apex:
-            #         with amp.scale_loss(loss, self.optimizer) as scale_loss:
-            #             scale_loss = scale_loss.half()
-            #             scale_loss.backward()
-            #     else:
-            #         loss.backward()
-
-            #     output = F.softmax(output, dim=1)
-            # else:
             self.optimizer.zero_grad()
             # self.net.module.freeze_backbone()
             [output, output_ratios] = self.net(img)
@@ -144,18 +120,11 @@ class Trainer:
             output_tmp = output_tmp.permute(2, 3, 0, 1)
             output = output_tmp * dynamic.float()
 
-            # if self.args.apex:
-            #     with amp.scale_loss(loss, self.optimizer) as scale_loss:
-            #         scale_loss = scale_loss.half()
-            #         scale_loss.backward()
-            # else:
-            #     loss.backward()
             self.optimizer.step()
 
             self.train_metric.pixacc.update(output, tar)
             self.train_metric.miou.update(output, tar)
             self.train_metric.kappa.update(output, tar)
-            losses.update(loss)
 
             batch_time.update(time.time() - starttime)
             starttime = time.time()

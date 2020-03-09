@@ -42,7 +42,7 @@ class Rssrai(Dataset):
             self.len = len(self._data_list)
 
         if self._mode == 'test':
-            self._image_dir = os.path.join(self._base_dir, 'train_split_256', 'img')
+            self._image_dir = os.path.join(self._base_dir, 'test_split_256', 'img')
             self._data_list = os.listdir(self._image_dir)
             self.len = len(self._data_list)
 
@@ -57,6 +57,8 @@ class Rssrai(Dataset):
 
     def load_test_numpy(self, idx):
         img = np.load(os.path.join(self._image_dir, self._data_list[idx]))
+        img = self._test_enhance(img)
+        img = img.transpose((2, 0, 1))
         return img, self._data_list[idx]
 
     def load_numpy(self, idx, mode):
@@ -117,4 +119,8 @@ class Rssrai(Dataset):
         ], additional_targets={'image': 'image', 'label': 'mask'})
         sample['image'] = sample['image'].transpose((1, 2, 0))
 
-        return compose(**sample)
+    def _test_enhance(self, image):
+        image = image.transpose(1, 2, 0)
+        norm = A.Compose([
+            A.Normalize(mean=self.mean, std=self.std, p=1)])
+        return norm(image=image)['image']
