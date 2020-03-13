@@ -14,6 +14,7 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 
 
+NUM_CLASSES = 16
 def get_labels(label_number):
     """
     :return: (19 , 3)
@@ -288,6 +289,36 @@ class SoftCrossEntropyLoss(nn.Module):
         return loss.sum() / (mask.sum() + self.eps)
 
 
+class Circumference(nn.Module):
+    '''计算mask中所有种类的平均周长'''
+    def __init__(self):
+        super().__init__()
+
+    def cal_circle(self, pred):
+        segmap = self.label_indices(pred.transpose(2, 0, 1))
+        print(segmap.shape)
+        scale = segmap.shape
+        ans_rows = np.zeros((scale[0] - 1, scale[1]))
+        ans_cols = np.zeros((scale[1] - 1, scale[0]))
+        for i in range(scale[0] - 1):
+            ans_rows[i] = segmap[i] != segmap[i + 1]
+        for i in range(scale[1] - 1):
+            ans_cols[i] = segmap[:, i] != segmap[:, i + 1]
+        return (ans_rows.sum() + ans_cols.sum()) / NUM_CLASSES
+
+    def label_indices(self, mask):
+        # # colormap2label
+        colormap2label = np.zeros(256**3)
+        mask_colormap = get_labels(NUM_CLASSES)
+        for i, colormap in enumerate(mask_colormap):
+            colormap2label[(colormap[0] * 256 + colormap[1]) * 256 + colormap[2]] = i
+
+        # colormap2mask
+        mask = mask.astype('int32')
+        idx = (mask[0, :, :] * 256 + mask[1, :, :]) * 256 + mask[2, :, :]
+        return colormap2label[idx].astype('int32')
+
+
 class FocalLoss(nn.Module):
     def __init__(self, alpha=1, gamma=2, eps=1e-7, reducation='mean'):
         super().__init__()
@@ -321,7 +352,8 @@ class FocalLoss(nn.Module):
 
 
 if __name__ == '__main__':
-    path = '/home/arron/dataset/rssrai_grey/rssrai/train/img'
+    # path = '/home/arron/dataset/rssrai_grey/rssrai/train/img'
+    path = '/home/arron/dataset/rssrai_grey/increase/rssrai/test'
     save_path = '/home/arron/dataset/rssrai_grey/results/dt_resunet-resnet50' 
     res_path = '/home/arron/dataset/rssrai_grey/results/tmp_output/dt_resunet-resnet50'
     supermerger = SuperMerger(path, res_path, save_path)

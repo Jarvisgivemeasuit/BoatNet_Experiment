@@ -516,7 +516,8 @@ if __name__ == '__main__':
     # spliter_paths['img_format'] = '.tif'
 
     spliter_paths = {}
-    spliter_paths['data_path'] = os.path.join(paths_dict['ori_path'], 'img')
+    # spliter_paths['data_path'] = os.path.join(paths_dict['test_path'], 'img')
+    spliter_paths['data_path'] = paths_dict['test_path']
     spliter_paths['save_path'] = '/home/arron/dataset/rssrai_grey/increase/test_split_256/img'
     spliter_paths['img_format'] = '.tif'
 
