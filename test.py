@@ -23,14 +23,15 @@ import numpy as np
 
 
 class Tester:
-    def __init__(self, Args, param_path, save_path, batch_size):
+    def __init__(self, Args, param_path, save_path, batch_size, use_threshold):
         self.args = Args()
         self.batch_size = batch_size
+        self.use_threshold = use_threshold
+
         self.test_set = Rssrai(mode='test')
-        self.val_set = Rssrai(mode='val')
         self.num_classes = self.test_set.NUM_CLASSES
-        self.val_loader = DataLoader(self.val_set, batch_size=2, shuffle=False, num_workers=self.args.num_workers)
         self.test_loader = DataLoader(self.test_set, batch_size=self.batch_size, shuffle=False, num_workers=self.args.num_workers)
+
         self.net = torch.load(param_path)
         self.criterion1 = torch.nn.CrossEntropyLoss().cuda()
         self.criterion2 = SoftCrossEntropyLoss().cuda()
@@ -64,7 +65,10 @@ class Tester:
             if self.args.cuda:
                 img = img.float().cuda()
             with torch.no_grad():
-                [output, output_ratios] = self.net(img)
+                if self.use_threshold:
+                    [output, output_ratios] = self.net(img)
+                else:
+                    output = self.net(img)
 
             # loss1 = self.criterion1(output, tar.long())
             # loss2 = self.criterion2(output_ratios, ratios.float())
@@ -73,32 +77,26 @@ class Tester:
             # losses2.update(loss2)
             # losses.update(loss)
 
-            output_tmp = F.softmax(output, dim=1)
-            output_tmp = output_tmp.permute(2, 3, 0, 1)
-            output_ratios = F.softmax(output_ratios, dim=1)
-            dynamic = output_tmp > (1 - output_ratios) / (self.num_classes - 1)
-            dynamic = dynamic.permute(2, 3, 0, 1)
-            output_tmp = output_tmp.permute(2, 3, 0, 1)
-            output = output_tmp * dynamic.float()
+            if self.use_threshold:
+                output_tmp = F.softmax(output, dim=1)
+                output_tmp = output_tmp.permute(2, 3, 0, 1)
+                output_ratios = F.softmax(output_ratios, dim=1)
+                dynamic = output_tmp > (1 - output_ratios) / (self.num_classes - 1)
+                dynamic = dynamic.permute(2, 3, 0, 1)
+                output_tmp = output_tmp.permute(2, 3, 0, 1)
+                output = output_tmp * dynamic.float()
 
             # self.test_metric.pixacc.update(output, tar)
             # self.test_metric.miou.update(output, tar)
             # self.test_metric.kappa.update(output, tar)
 
-            # output = torch.argmax(output, dim=1).cpu().numpy()
-            # output_rgb_tmp = decode_segmap(output[0], self.num_classes).astype(np.uint8)
-            # output_rgb_tmp =Image.fromarray(output_rgb_tmp)
-            # output_rgb_tmp.save(os.path.join(self.final_save_path, img_file[0].replace('npy', 'tif')))
-
-            # output_rgb_tmp = decode_segmap(output[1], self.num_classes).astype(np.uint8)
-            # output_rgb_tmp =Image.fromarray(output_rgb_tmp)
-            # output_rgb_tmp.save(os.path.join(self.final_save_path, img_file[1].replace('npy', 'tif')))
             self.save_image(output, img_file)
 
             batch_time.update(time.time() - starttime)
             starttime = time.time()
 
-            bar.suffix = '''({batch}/{size}) Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} |'''.format(
+            bar.suffix = '''({batch}/{size}) Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} |
+                         '''.format(
                             #  Loss:{loss:.4f},loss1:{loss1:.4f},loss2:{loss2:.4f} | Acc: {Acc: .4f} | mIoU: {mIoU: .4f} |'''.format(
                 batch=idx + 1,
                 size=num_test,
@@ -127,7 +125,7 @@ class Tester:
 def test():
     save_result_path = '/home/arron/dataset/rssrai_grey/results/tmp_output'
     param_path = '/home/arron/Documents/grey/paper/model_saving/dt_resunet-resnet50-0210_bast_pred.pth'
-    tester = Tester(Args, param_path, save_result_path, 16)
+    tester = Tester(Args, param_path, save_result_path, 16, use_threshold=True)
 
     print("==> Start testing")
     tester.testing()

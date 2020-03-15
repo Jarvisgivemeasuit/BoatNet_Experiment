@@ -5,7 +5,6 @@ import matplotlib.pyplot as plt
 from PIL import Image
 sys.path.append('../')
 
-from dataset import rssrai2
 from dataset import rssrai
 
 import torch
@@ -86,8 +85,8 @@ def get_labels(label_number):
 
 
 def make_dataset():
-    train_set = rssrai2.Rssrai(mode='train')
-    val_set = rssrai2.Rssrai(mode='val')
+    train_set = rssrai.Rssrai(mode='train')
+    val_set = rssrai.Rssrai(mode='val')
     return train_set, val_set, train_set.NUM_CLASSES
 
 
@@ -142,7 +141,6 @@ class TensorboardSummary:
         self.directory = directory
         self.writer = SummaryWriter(logdir=os.path.join(self.directory))
         plt.axis('off')
-
 
 
 # 将output拼接成完整的图片
@@ -356,9 +354,9 @@ if __name__ == '__main__':
     path = '/home/arron/dataset/rssrai_grey/increase/rssrai/test'
     save_path = '/home/arron/dataset/rssrai_grey/results/dt_resunet-resnet50' 
     res_path = '/home/arron/dataset/rssrai_grey/results/tmp_output/dt_resunet-resnet50'
-    supermerger = SuperMerger(path, res_path, save_path)
+    # supermerger = SuperMerger(path, res_path, save_path)
     # print(supermerger.ori_list)
-    supermerger.merge_image()
+    # supermerger.merge_image()
 
 
     # lists = os.listdir(res_path)

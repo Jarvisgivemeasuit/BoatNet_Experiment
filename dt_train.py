@@ -15,7 +15,7 @@ import experiment.utils.metrics as metrics
 from experiment.utils.args import Args
 from experiment.utils.utils import *
 from experiment.model import get_model, save_model
-from experiment.dataset.rssrai2 import Rssrai
+from experiment.dataset.rssrai import Rssrai
 
 import torch
 from torch import nn
@@ -44,8 +44,7 @@ class Trainer:
                                      shuffle=False, num_workers=self.args.num_workers)
 
         self.net = get_model(self.args.model_name, self.args.backbone, 
-                                             self.args.inplanes, self.num_classes).cuda()
-        self.switch = 1
+                             self.args.inplanes, self.num_classes, self.args.use_threshold).cuda()
         # self.net = torch.load('/home/arron/Documents/grey/paper/model_saving/resnet50-resunet-bast_pred.pth')
 
         self.optimizer = torch.optim.SGD(self.net.parameters(), lr=self.args.lr, momentum=0.9)
@@ -56,11 +55,10 @@ class Trainer:
 
         self.criterion1 = nn.CrossEntropyLoss().cuda()
         # self.criterion1 = FocalLoss().cuda()
-        # self.criterion2 = nn.MSELoss().cuda()
         self.criterion2 = SoftCrossEntropyLoss().cuda()
         self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, [20, 40, 60, 100], 0.3)
         # self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, mode='min', factor=0.3, patience=3)
-        
+
         self.Metric = namedtuple('Metric', 'pixacc miou kappa')
 
         self.train_metric = self.Metric(pixacc=metrics.PixelAccuracy(),
@@ -95,14 +93,19 @@ class Trainer:
                 img, tar, ratios = img.cuda(), tar.cuda(), ratios.cuda()
 
             self.optimizer.zero_grad()
-            # self.net.module.freeze_backbone()
-            [output, output_ratios] = self.net(img)
-            loss1 = self.criterion1(output, tar.long())
-            loss2 = self.criterion2(output_ratios, ratios.float())
-            loss = loss1 + loss2
-            losses1.update(loss1)
-            losses2.update(loss2)
-            losses.update(loss)
+            if self.args.use_threshold:
+                [output, output_ratios] = self.net(img)
+
+                loss1 = self.criterion1(output, tar.long())
+                loss2 = self.criterion2(output_ratios, ratios.float())
+                loss = loss1 + loss2
+                losses1.update(loss1)
+                losses2.update(loss2)
+                losses.update(loss)
+            else:
+                output = self.net(img)
+                loss = self.criterion1(output, tar.long())
+                losses.update(loss)
 
             if self.args.apex:
                 with amp.scale_loss(loss, self.optimizer) as scale_loss:
@@ -111,14 +114,14 @@ class Trainer:
             else:
                 loss.backward()
 
-            # if epoch > 2:
-            output_tmp = F.softmax(output, dim=1)
-            output_tmp = output_tmp.permute(2, 3, 0, 1)
-            output_ratios = F.softmax(output_ratios, dim=1)
-            dynamic = output_tmp > (1 - output_ratios) / (self.num_classes - 1)
-            dynamic = dynamic.permute(2, 3, 0, 1)
-            output_tmp = output_tmp.permute(2, 3, 0, 1)
-            output = output_tmp * dynamic.float()
+            if self.args.use_threshold:
+                output_tmp = F.softmax(output, dim=1)
+                output_tmp = output_tmp.permute(2, 3, 0, 1)
+                output_ratios = F.softmax(output_ratios, dim=1)
+                dynamic = output_tmp > (1 - output_ratios) / (self.num_classes - 1)
+                dynamic = dynamic.permute(2, 3, 0, 1)
+                output_tmp = output_tmp.permute(2, 3, 0, 1)
+                output = output_tmp * dynamic.float()
 
             self.optimizer.step()
 
@@ -149,7 +152,7 @@ class Trainer:
         if self.train_metric.pixacc.get() > self.best_pred and self.train_metric.miou.get() > self.best_miou:
             self.best_pred = self.train_metric.pixacc.get()
             self.best_miou = self.train_metric.miou.get()
-            save_model(self.net, self.args.model_name, 'resnet50', '0210')
+            save_model(self.net, self.args.model_name, 'resnet50', self.best_pred, self.best_miou)
 
     def validation(self, epoch):
 
@@ -174,22 +177,25 @@ class Trainer:
             if self.args.cuda:
                 img, tar, ratios = img.cuda(), tar.cuda(), ratios.cuda()
             with torch.no_grad():
-                [output, output_ratios] = self.net(img)
+                if self.args.use_threshold:
+                    [output, output_ratios] = self.net(img)
 
-            loss1 = self.criterion1(output, tar.long())
-            loss2 = self.criterion2(output_ratios, ratios.float())
-            loss = loss1 + loss2
-            losses1.update(loss1)
-            losses2.update(loss2)
-            losses.update(loss)
+                    loss1 = self.criterion1(output, tar.long())
+                    loss2 = self.criterion2(output_ratios, ratios.float())
+                    loss = loss1 + loss2
+                    losses1.update(loss1)
+                    losses2.update(loss2)
+                    losses.update(loss)
 
-            output_tmp = F.softmax(output, dim=1)
-            output_tmp = output.permute(2, 3, 0, 1)
-            output_ratios = F.softmax(output_ratios, dim=1)
-            dynamic = output_tmp > (1 - output_ratios) / (self.num_classes - 1)
-            dynamic = dynamic.permute(2, 3, 0, 1)
-            output_tmp = output_tmp.permute(2, 3, 0, 1)
-            output = output_tmp * dynamic.float()
+                    output_tmp = F.softmax(output, dim=1)
+                    output_tmp = output.permute(2, 3, 0, 1)
+                    output_ratios = F.softmax(output_ratios, dim=1)
+                    dynamic = output_tmp > (1 - output_ratios) / (self.num_classes - 1)
+                    dynamic = dynamic.permute(2, 3, 0, 1)
+                    output_tmp = output_tmp.permute(2, 3, 0, 1)
+                    output = output_tmp * dynamic.float()
+                else:
+                    output = self.net(img)
 
             self.val_metric.pixacc.update(output, tar)
             self.val_metric.miou.update(output, tar)

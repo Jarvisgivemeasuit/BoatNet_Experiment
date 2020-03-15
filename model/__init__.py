@@ -1,22 +1,20 @@
 import os
 import torch
-from model.resunet.resunet import UNet
-from model.boat_resunet.boat_resunet import Boat_UNet
-from model.boat_resunet.dt_resunet import Dy_UNet, Pred_Fore_Rate
+from model.dt_unet.dt_unet import Dt_UNet
 
 
-def get_model(model_name, backbone, inplanes, num_classes):
+def get_model(model_name, backbone, inplanes, num_classes, use_threshold):
     if model_name == 'resunet':
         return UNet(inplanes, num_classes, backbone)
     if model_name == 'boat_resunet':
         return Boat_UNet(inplanes, num_classes, backbone[0], backbone[1])
-    if model_name == 'dt_resunet':
-        return Dy_UNet(inplanes, num_classes, backbone)
+    if model_name == 'unet':
+        return Dt_UNet(inplanes, num_classes, backbone, use_threshold)
 
 
-def save_model(model, model_name, backbone, annotations=None):
+def save_model(model, model_name, backbone, pred, miou):
     save_path = '/home/arron/Documents/grey/paper/model_saving/'
-    torch.save(model, os.path.join(save_path, "{}-{}-{}_bast_pred.pth"
-                                    .format(model_name, backbone, annotations)))
+    torch.save(model, os.path.join(save_path, "{}-{}-{:.3f}-{:.3f}_best_pred.pth"
+                                    .format(model_name, backbone, pred, miou)))
 
     print('saved model successful.')
