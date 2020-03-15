@@ -56,6 +56,39 @@ class ResDown(nn.Module):
         return output0, output1, output2, output3, output4
 
 
+class GCN(nn.Module):
+    def __init__(self, inplanes, k=(7, 7)):
+        super().__init__()
+        self.conv_l1 = nn.Conv2d(inplanes, 21, kernel_size=(k[0], 1), padding=((k[0]-1)/2, 0))
+        self.conv_l2 = nn.Conv2d(21, 21, kernel_size=(1, k[0]), padding=(0, (k[0]-1)/2))
+        self.conv_r1 = nn.Conv2d(inplanes, 21, kernel_size=(1, k[0]), padding=(0, (k[0]-1)/2))
+        self.conv_r2 = nn.Conv2d(21, 21, kernel_size=(k[0], 1), padding=((k[0]-1)/2, 0))
+
+    def forward(self, x):
+        x_l = self.conv_l1(x)
+        x_l = self.conv_l2(x_l)
+
+        x_r = self.conv_r1(x)
+        x_r = self.conv_r2(x_r)
+
+        x = x_l + x_r
+
+        return x
+
+
+class BR(nn.Module):
+    def __init__(self):
+        self.res = nn.Sequential(
+            nn.Conv2d(21, 21, 3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(21, 21, 3, padding=1)
+        )
+
+    def forward(self, x):
+        x_res = self.res(x)
+        return x + x_res
+
+
 class Pred_Fore_Rate(nn.Module):
     def __init__(self):
         super().__init__()
