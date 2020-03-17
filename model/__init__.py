@@ -12,9 +12,9 @@ def get_model(model_name, backbone, inplanes, num_classes, use_threshold, use_gc
         return Dt_UNet(inplanes, num_classes, backbone, use_threshold, use_gcn)
 
 
-def save_model(model, model_name, backbone, pred, miou):
+def save_model(model, model_name, backbone, pred, miou, use_threshold, use_gcn):
     save_path = '/home/arron/Documents/grey/paper/model_saving/'
-    torch.save(model, os.path.join(save_path, "{}-{}-{:.3f}-{:.3f}_best_pred.pth"
-                                    .format(model_name, backbone, pred, miou)))
+    torch.save(model, os.path.join(save_path, "{}-{}-{:.3f}-{:.3f}_{}_{}.pth"
+                                    .format(model_name, backbone, pred, miou, use_threshold, use_gcn)))
 
     print('saved model successful.')

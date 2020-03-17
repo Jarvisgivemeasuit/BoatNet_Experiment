@@ -153,7 +153,8 @@ class Trainer:
         if self.train_metric.pixacc.get() > self.best_pred and self.train_metric.miou.get() > self.best_miou:
             self.best_pred = self.train_metric.pixacc.get()
             self.best_miou = self.train_metric.miou.get()
-            save_model(self.net, self.args.model_name, 'resnet50', self.best_pred, self.best_miou)
+            save_model(self.net, self.args.model_name, 'resnet50', self.best_pred, self.best_miou,
+                        self.args.use_threshold, self.args.use_gcn)
 
     def validation(self, epoch):
 
