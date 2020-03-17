@@ -9,6 +9,7 @@ class Args:
         self.inplanes = 4
 
         self.use_threshold = True
+        self.use_gcn = True
         self.model_name = 'unet'
         self.backbone = 'resnet50'
         self.annotations = 'deconv-deconv'

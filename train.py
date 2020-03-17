@@ -44,7 +44,8 @@ class Trainer:
                                      shuffle=False, num_workers=self.args.num_workers)
 
         self.net = get_model(self.args.model_name, self.args.backbone, 
-                             self.args.inplanes, self.num_classes, self.args.use_threshold).cuda()
+                             self.args.inplanes, self.num_classes, 
+                             self.args.use_threshold, self.args.use_gcn).cuda()
         # self.net = torch.load('/home/arron/Documents/grey/paper/model_saving/resnet50-resunet-bast_pred.pth')
 
         self.optimizer = torch.optim.SGD(self.net.parameters(), lr=self.args.lr, momentum=0.9)

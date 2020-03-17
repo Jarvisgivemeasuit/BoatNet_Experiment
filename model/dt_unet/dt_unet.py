@@ -59,10 +59,10 @@ class ResDown(nn.Module):
 class GCN(nn.Module):
     def __init__(self, inplanes, k=(7, 7)):
         super().__init__()
-        self.conv_l1 = nn.Conv2d(inplanes, 21, kernel_size=(k[0], 1), padding=((k[0]-1)/2, 0))
-        self.conv_l2 = nn.Conv2d(21, 21, kernel_size=(1, k[0]), padding=(0, (k[0]-1)/2))
-        self.conv_r1 = nn.Conv2d(inplanes, 21, kernel_size=(1, k[0]), padding=(0, (k[0]-1)/2))
-        self.conv_r2 = nn.Conv2d(21, 21, kernel_size=(k[0], 1), padding=((k[0]-1)/2, 0))
+        self.conv_l1 = nn.Conv2d(inplanes, 21, kernel_size=(k[0], 1), padding=(int((k[0]-1)/2), 0))
+        self.conv_l2 = nn.Conv2d(21, 21, kernel_size=(1, k[0]), padding=(0, int((k[0]-1)/2)))
+        self.conv_r1 = nn.Conv2d(inplanes, 21, kernel_size=(1, k[1]), padding=(0, int((k[1]-1)/2)))
+        self.conv_r2 = nn.Conv2d(21, 21, kernel_size=(k[1], 1), padding=(int((k[1]-1)/2), 0))
 
     def forward(self, x):
         x_l = self.conv_l1(x)
@@ -78,9 +78,10 @@ class GCN(nn.Module):
 
 class BR(nn.Module):
     def __init__(self):
+        super().__init__()
         self.res = nn.Sequential(
             nn.Conv2d(21, 21, 3, padding=1),
-            nn.ReLU(inplace=True),
+            nn.LeakyReLU(inplace=True),
             nn.Conv2d(21, 21, 3, padding=1)
         )
 
@@ -93,7 +94,6 @@ class Pred_Fore_Rate(nn.Module):
     def __init__(self):
         super().__init__()
         self.de_ratio = ChDecrease(2048, 128)
-        # self.double_conv = Double_conv(16, 16)
         self.conv = nn.Sequential(
             nn.Conv2d(16, 16, 3, stride=2, padding=1),
             nn.BatchNorm2d(16),
@@ -157,6 +157,32 @@ class Up(nn.Module):
         return x
 
 
+class Up_Gcn(nn.Module):
+    def __init__(self, bilinear=False, last_cat=False):
+        super().__init__()
+        if bilinear:
+            self.up = nn.Upsample(scale_factor=2, mode="bilinear", align_corners=True)
+        else:
+            self.up = nn.ConvTranspose2d(21, 21, 2, stride=2)
+        self.br = BR()
+        self.last_cat = last_cat
+
+    def forward(self, x1, x2):
+        if not self.last_cat:
+            x1 = self.up(x1)
+
+        # input is CHW
+        diffY = x2.size()[2] - x1.size()[2]
+        diffX = x2.size()[3] - x1.size()[3]
+
+        x1 = F.pad(x1, (diffX // 2, diffX - diffX // 2,
+                        diffY // 2, diffY - diffY // 2))
+
+        x = x1 + x2
+        x = self.br(x)
+        return x
+
+
 class ChDecrease(nn.Module):
     def __init__(self, inplanes, times):
         super().__init__()
@@ -168,12 +194,13 @@ class ChDecrease(nn.Module):
 
 
 class Dt_UNet(nn.Module):
-    def __init__(self, inplanes, num_classes, backbone, use_threshold):
+    def __init__(self, inplanes, num_classes, backbone, use_threshold, use_gcn):
         super().__init__()
         self.down = ResDown(in_channels=inplanes, backbone=backbone)
         self.backbone = backbone
         self.num_classes = num_classes
         self.use_threshold = use_threshold
+        self.use_gcn = use_gcn
 
         if self.backbone not in ['resnet18', 'resnet34']:
             self.de1 = ChDecrease(256, 4)
@@ -183,11 +210,23 @@ class Dt_UNet(nn.Module):
 
         self.fore_pred = Pred_Fore_Rate()
 
-        self.up1 = Up(512, 768, 256)
-        self.up2 = Up(256, 384, 128)
-        self.up3 = Up(128, 192, 64)
-        self.up4 = Up(64, 128, 64, last_cat=True)
-        self.up5 = Up(64, 68, 64)
+        if self.use_gcn:
+            self.gcn1 = GCN(512)
+            self.gcn2 = GCN(256)
+            self.gcn3 = GCN(128)
+            self.gcn4 = GCN(64)
+
+            self.br = BR()
+
+            self.up = Up_Gcn()
+            self.up1 = Up(21, 85, 64)
+            self.up2 = Up(64, 68, 64)
+        else:
+            self.up1 = Up(512, 768, 256)
+            self.up2 = Up(256, 384, 128)
+            self.up3 = Up(128, 192, 64)
+            self.up4 = Up(64, 128, 64, last_cat=True)
+            self.up5 = Up(64, 68, 64)
 
         self.outconv = Double_conv(64, self.num_classes)
 
@@ -203,11 +242,23 @@ class Dt_UNet(nn.Module):
             x3 = self.de3(x3)
             x4 = self.de4(x4)
 
-        x = self.up1(x4, x3)
-        x = self.up2(x, x2)
-        x = self.up3(x, x1)
-        x = self.up4(x, x0)
-        x = self.up5(x, ori_x)
+        if self.use_gcn:
+            x4 = self.br(self.gcn1(x4))
+            x3 = self.br(self.gcn2(x3))
+            x2 = self.br(self.gcn3(x2))
+            x1 = self.br(self.gcn4(x1))
+
+            x = self.up(x4, x3)
+            x = self.up(x, x2)
+            x = self.up(x, x1)
+            x = self.up1(x, x0)
+            x = self.up2(x, ori_x)
+        else:
+            x = self.up1(x4, x3)
+            x = self.up2(x, x2)
+            x = self.up3(x, x1)
+            x = self.up4(x, x0)
+            x = self.up5(x, ori_x)
 
         output = self.outconv(x)
 
@@ -222,12 +273,8 @@ class Dt_UNet(nn.Module):
             param.requires_grad = True
 
 
-# net = Boat_UNet(4, 16, 'resnet50')
-# summary(net.cuda(), (4, 256, 256))
-
 # net = Pred_Fore_Rate().cuda()
 # summary(net.cuda(), (512, 16, 16))
 
-# test_data = torch.randn([2, 512, 16, 16], requires_grad=True).cuda()
-# aa = net(test_data)
-# print(aa.requires_grad)
+# net = Dt_UNet(4, 16, 'resnet50', False).cuda()
+# summary(net, (4, 256, 256))
