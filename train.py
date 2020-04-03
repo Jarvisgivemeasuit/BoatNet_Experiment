@@ -8,14 +8,15 @@ from progress.bar import Bar
 from apex import amp
 from PIL import Image
 from pprint import pprint
+from tensorboardX import SummaryWriter
 
-sys.path.append("/home/arron/Documents/grey/paper/")
+# sys.path.append("/home/arron/Documents/grey/paper/")
 
-import experiment.utils.metrics as metrics
-from experiment.utils.args import Args
-from experiment.utils.utils import *
-from experiment.model import get_model, save_model
-from experiment.dataset.rssrai import Rssrai
+import utils.metrics as metrics
+from utils.args import Args
+from utils.utils import *
+from model import get_model, save_model
+from dataset.rssrai import Rssrai
 
 import torch
 from torch import nn
@@ -24,6 +25,7 @@ from torch.utils.data import DataLoader
 import torch.nn.functional as F
 import torch.optim
 import numpy as np 
+import random
 
 
 class Trainer:
@@ -46,18 +48,16 @@ class Trainer:
         self.net = get_model(self.args.model_name, self.args.backbone, 
                              self.args.inplanes, self.num_classes, 
                              self.args.use_threshold, self.args.use_gcn).cuda()
-        # self.net = torch.load('/home/arron/Documents/grey/paper/model_saving/resnet50-resunet-bast_pred.pth')
 
         self.optimizer = torch.optim.SGD(self.net.parameters(), lr=self.args.lr, momentum=0.9)
         if self.args.apex:
             self.net, self.optimizer = amp.initialize(self.net, self.optimizer, opt_level='O1')
 
-        self.net = nn.DataParallel(self.net, self.args.gpu_ids)
+        # self.net = nn.DataParallel(self.net, self.args.gpu_ids)
 
         self.criterion1 = nn.CrossEntropyLoss().cuda()
-        # self.criterion1 = FocalLoss().cuda()
-        self.criterion2 = SoftCrossEntropyLoss().cuda()
-        self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, [20, 40, 60, 100], 0.3)
+        self.criterion2 = SoftCrossEntropyLoss(times=1).cuda()
+        self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, [20, 50, 70, 90], 0.2)
         # self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, mode='min', factor=0.3, patience=3)
 
         self.Metric = namedtuple('Metric', 'pixacc miou kappa')
@@ -69,6 +69,14 @@ class Trainer:
         self.val_metric = self.Metric(pixacc=metrics.PixelAccuracy(),
                                         miou=metrics.MeanIoU(self.num_classes),
                                         kappa=metrics.Kappa(self.num_classes))
+
+        # self.writer_acc = SummaryWriter('dt_gcn/acc')
+        # self.writer_miou = SummaryWriter('dt_gcn/miou')
+        # self.writer_kappa = SummaryWriter('dt_gcn/kappa')
+
+        self.writer_acc = SummaryWriter('dt/acc')
+        self.writer_miou = SummaryWriter('dt/miou')
+        self.writer_kappa = SummaryWriter('dt/kappa')
 
     def training(self, epoch):
 
@@ -150,11 +158,11 @@ class Trainer:
         bar.finish()
         print('[Epoch: %d, numImages: %5d]' % (epoch, num_train * self.args.tr_batch_size))
         print('Train Loss: %.3f' % losses.avg)
-        if self.train_metric.pixacc.get() > self.best_pred and self.train_metric.miou.get() > self.best_miou:
-            self.best_pred = self.train_metric.pixacc.get()
-            self.best_miou = self.train_metric.miou.get()
-            save_model(self.net, self.args.model_name, 'resnet50', self.best_pred, self.best_miou,
-                        self.args.use_threshold, self.args.use_gcn)
+
+        self.writer_acc.add_scalar('train', self.train_metric.pixacc.get(), epoch)
+        self.writer_miou.add_scalar('train', self.train_metric.miou.get(), epoch)
+        self.writer_kappa.add_scalar('train', self.train_metric.kappa.get(), epoch)
+        self.writer_acc.add_scalar('train/train_loss', losses.avg, epoch)
 
     def validation(self, epoch):
 
@@ -198,6 +206,8 @@ class Trainer:
                     output = output_tmp * dynamic.float()
                 else:
                     output = self.net(img)
+                    loss = self.criterion1(output, tar.long())
+                    losses.update(loss)
 
             self.val_metric.pixacc.update(output, tar)
             self.val_metric.miou.update(output, tar)
@@ -209,7 +219,7 @@ class Trainer:
             batch_time.update(time.time() - starttime)
             starttime = time.time()
 
-            bar.suffix = '({batch}/{size}) Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss: {loss:.4f}, loss1: {loss1:.4f}, loss2: {loss2:.4f}| Acc: {Acc: .4f} | mIoU: {mIoU: .4f} | kappa: {kappa: .4f}'.format(
+            bar.suffix = '({batch}/{size}) Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss: {loss:.4f},loss1: {loss1:.4f},loss2: {loss2:.4f}| Acc: {Acc: .4f} | mIoU: {mIoU: .4f} | kappa: {kappa: .4f}'.format(
                 batch=idx + 1,
                 size=len(self.val_loader),
                 bt=batch_time.avg,
@@ -223,26 +233,33 @@ class Trainer:
                 kappa=self.val_metric.kappa.get()
             )
             bar.next()
-            if idx + 1 == len(self.val_loader):
-                print()
-                pprint(output_ratios[0])
-                pprint(ratios[0])
+            # if self.args.use_threshold:
+            #     if idx + 1 == len(self.val_loader):
+            #         ii = random.randint(0, self.args.vd_batch_size / 2 - 1)
+            #         print()
+            #         pprint(output_ratios[ii])
+            #         pprint(ratios[ii])
         bar.finish()
 
-        new_pred = self.val_metric.miou.get()
-        metric_str = "Acc:{:.4f}, mIoU:{:.4f}, kappa: {:.4f}".format(self.val_metric.pixacc.get(),
-                                                                    new_pred,
-                                                                    self.val_metric.kappa.get())
-        print('Validation:')
-        print(f"[Epoch: {epoch}, numImages: {num_val * self.args.vd_batch_size}]")
+        print(f'Validation:[Epoch: {epoch}, numImages: {num_val * self.args.vd_batch_size}]')
         print(f'Valid Loss: {losses.avg:.4f}')
-        if self.train_metric.pixacc.get() > self.best_pred and self.train_metric.miou.get() > self.best_miou:
-            self.best_pred = self.train_metric.pixacc.get()
-            self.best_miou = self.train_metric.miou.get()
-            save_model(self.net, self.args.model_name, 
-                       self.args.backbone1, self.args.annotations)
+        if self.val_metric.miou.get() > self.best_miou:
+            if  self.val_metric.pixacc.get() > self.best_pred:
+                self.best_pred = self.val_metric.pixacc.get()
+            self.best_miou = self.val_metric.miou.get()
+            save_model(self.net, self.args.model_name, 'resnet50', self.best_pred, self.best_miou,
+                        self.args.use_threshold, self.args.use_gcn)
+        print("-----best acc:{:.4f}, best miou:{:.4f}-----".format(self.best_pred, self.best_miou))
 
-        return new_pred
+        self.writer_acc.add_scalar('val', self.val_metric.pixacc.get(), epoch)
+        self.writer_miou.add_scalar('val', self.val_metric.miou.get(), epoch)
+        self.writer_kappa.add_scalar('val', self.val_metric.kappa.get(), epoch)
+        self.writer_acc.add_scalar('val/val_loss', losses.avg, epoch)
+
+        if epoch == self.args.epochs:
+            self.writer.close()
+        return self.val_metric.pixacc.get()
+
 
     def get_lr(self):
         return self.optimizer.param_groups[0]['lr']

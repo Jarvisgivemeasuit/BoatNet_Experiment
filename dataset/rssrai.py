@@ -11,14 +11,13 @@ from libtiff import TIFF
 from PIL import Image
 import albumentations as A
 
-# from .path import Path
 from .rssrai_utils import *
 
 
 class Rssrai(Dataset):
     NUM_CLASSES = 16
     
-    def __init__(self, mode='train', base_dir=Path.get_root_path('rssrai_increase')):
+    def __init__(self, mode='train', base_dir=Path.get_root_path('rssrai_grey')):
         assert mode in ['train', 'val', 'test']
         super().__init__()
 
@@ -28,16 +27,16 @@ class Rssrai(Dataset):
         self.std = std
 
         if self._mode == 'train':
-            self._image_dir = os.path.join(self._base_dir, 'train_split_256', 'img')
-            self._label_dir = os.path.join(self._base_dir, 'train_split_256', 'mask')
-            self._ratios_dir = os.path.join(self._base_dir, 'train_split_256', 'ratios')
+            self._image_dir = os.path.join(self._base_dir, 'train_split_192', 'img')
+            self._label_dir = os.path.join(self._base_dir, 'train_split_192', 'mask')
+            self._ratios_dir = os.path.join(self._base_dir, 'train_split_192', 'ratios')
             self._data_list = os.listdir(self._image_dir)
             self.len = len(self._data_list)
 
         if self._mode == 'val':
-            self._image_dir = os.path.join(self._base_dir, 'val_split_256', 'img')
-            self._label_dir = os.path.join(self._base_dir, 'val_split_256', 'mask')
-            self._ratios_dir = os.path.join(self._base_dir, 'val_split_256', 'ratios')
+            self._image_dir = os.path.join(self._base_dir, 'val_split_192', 'img')
+            self._label_dir = os.path.join(self._base_dir, 'val_split_192', 'mask')
+            self._ratios_dir = os.path.join(self._base_dir, 'val_split_192', 'ratios')
             self._data_list = os.listdir(self._image_dir)
             self.len = len(self._data_list)
 
@@ -65,8 +64,7 @@ class Rssrai(Dataset):
         image = np.load(os.path.join(self._image_dir, self._data_list[idx]))
         mask = np.load(os.path.join(self._label_dir, self._data_list[idx]))
 
-        binary_dict = np.load(os.path.join(self._ratios_dir, self._data_list[idx]), allow_pickle=True).item()
-        binary_mask, ratios = binary_dict['binary_mask'], binary_dict['ratios']
+        ratios = np.load(os.path.join(self._ratios_dir, self._data_list[idx]))
         sample = {'image': image, 'label': mask}
         if mode == 'train':
             sample = self._train_enhance(sample)

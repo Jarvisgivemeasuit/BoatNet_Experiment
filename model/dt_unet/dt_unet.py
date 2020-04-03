@@ -11,6 +11,7 @@ from .dt_unet_utils import initialize_weights
 import torch.nn.functional as F
 
 BACKBONE = 'resnet50'
+NUM_CLASSES = 16
 
 
 class ResDown(nn.Module):
@@ -59,10 +60,10 @@ class ResDown(nn.Module):
 class GCN(nn.Module):
     def __init__(self, inplanes, k=(7, 7)):
         super().__init__()
-        self.conv_l1 = nn.Conv2d(inplanes, 21, kernel_size=(k[0], 1), padding=(int((k[0]-1)/2), 0))
-        self.conv_l2 = nn.Conv2d(21, 21, kernel_size=(1, k[0]), padding=(0, int((k[0]-1)/2)))
-        self.conv_r1 = nn.Conv2d(inplanes, 21, kernel_size=(1, k[1]), padding=(0, int((k[1]-1)/2)))
-        self.conv_r2 = nn.Conv2d(21, 21, kernel_size=(k[1], 1), padding=(int((k[1]-1)/2), 0))
+        self.conv_l1 = nn.Conv2d(inplanes, NUM_CLASSES, kernel_size=(k[0], 1), padding=(int((k[0]-1)/2), 0))
+        self.conv_l2 = nn.Conv2d(NUM_CLASSES, NUM_CLASSES, kernel_size=(1, k[0]), padding=(0, int((k[0]-1)/2)))
+        self.conv_r1 = nn.Conv2d(inplanes, NUM_CLASSES, kernel_size=(1, k[1]), padding=(0, int((k[1]-1)/2)))
+        self.conv_r2 = nn.Conv2d(NUM_CLASSES, NUM_CLASSES, kernel_size=(k[1], 1), padding=(int((k[1]-1)/2), 0))
 
     def forward(self, x):
         x_l = self.conv_l1(x)
@@ -80,9 +81,9 @@ class BR(nn.Module):
     def __init__(self):
         super().__init__()
         self.res = nn.Sequential(
-            nn.Conv2d(21, 21, 3, padding=1),
+            nn.Conv2d(NUM_CLASSES, NUM_CLASSES, 3, padding=1),
             nn.LeakyReLU(inplace=True),
-            nn.Conv2d(21, 21, 3, padding=1)
+            nn.Conv2d(NUM_CLASSES, NUM_CLASSES, 3, padding=1)
         )
 
     def forward(self, x):
@@ -158,12 +159,12 @@ class Up(nn.Module):
 
 
 class Up_Gcn(nn.Module):
-    def __init__(self, bilinear=False, last_cat=False):
+    def __init__(self, inplanes, bilinear=False, last_cat=False):
         super().__init__()
         if bilinear:
             self.up = nn.Upsample(scale_factor=2, mode="bilinear", align_corners=True)
         else:
-            self.up = nn.ConvTranspose2d(21, 21, 2, stride=2)
+            self.up = nn.ConvTranspose2d(inplanes, NUM_CLASSES, 2, stride=2)
         self.br = BR()
         self.last_cat = last_cat
 
@@ -218,9 +219,15 @@ class Dt_UNet(nn.Module):
 
             self.br = BR()
 
-            self.up = Up_Gcn()
-            self.up1 = Up(21, 85, 64)
-            self.up2 = Up(64, 68, 64)
+            # self.up = Up_Gcn()
+            # self.up1 = Up(NUM_CLASSES, 64 + NUM_CLASSES, 64)
+            # self.up2 = Up(64, 68, 64)
+
+            self.up1 = Up_Gcn(512 + NUM_CLASSES)
+            self.up2 = Up_Gcn(256 + NUM_CLASSES)
+            self.up3 = Up_Gcn(128 + NUM_CLASSES)
+            self.up4 = Up(64 + NUM_CLASSES, 128 + NUM_CLASSES, 64)
+            self.up5 = Up(64, 68, 64)
         else:
             self.up1 = Up(512, 768, 256)
             self.up2 = Up(256, 384, 128)
@@ -243,16 +250,27 @@ class Dt_UNet(nn.Module):
             x4 = self.de4(x4)
 
         if self.use_gcn:
-            x4 = self.br(self.gcn1(x4))
-            x3 = self.br(self.gcn2(x3))
-            x2 = self.br(self.gcn3(x2))
-            x1 = self.br(self.gcn4(x1))
+            # x4 = self.br(self.gcn1(x4))
+            # x3 = self.br(self.gcn2(x3))
+            # x2 = self.br(self.gcn3(x2))
+            # x1 = self.br(self.gcn4(x1))
 
-            x = self.up(x4, x3)
-            x = self.up(x, x2)
-            x = self.up(x, x1)
-            x = self.up1(x, x0)
-            x = self.up2(x, ori_x)
+            # x = self.up(x4, x3)
+            # x = self.up(x, x2)
+            # x = self.up(x, x1)
+            # x = self.br(self.up1(x, x0))
+            # x = self.br(self.up2(x, ori_x))
+
+            x4 = torch.cat([x4, self.br(self.gcn1(x4))], dim=1)
+            x = self.up1(x4, self.br(self.gcn2(x3)))
+            x3 = torch.cat([x3, x], dim=1)
+            x = self.up2(x3, self.br(self.gcn3(x2)))
+            x2 = torch.cat([x2, x], dim=1)
+            x = self.up3(x2, self.br(self.gcn4(x1)))
+            x1 = torch.cat([x1, x], dim=1)
+            x = self.up4(x1, x0)
+            x = self.up5(x, ori_x)
+
         else:
             x = self.up1(x4, x3)
             x = self.up2(x, x2)

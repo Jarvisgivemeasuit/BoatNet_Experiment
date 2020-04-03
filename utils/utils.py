@@ -273,9 +273,10 @@ class SuperMerger:
 
 class SoftCrossEntropyLoss(nn.Module):
 
-    def __init__(self, ignore_index=-1, eps=1e-7):
+    def __init__(self, ignore_index=-1, times=1, eps=1e-7):
         super().__init__()
         self.ignore_index = ignore_index
+        self.times = times
         self.eps = eps
 
     def forward(self, pred, target):
@@ -284,7 +285,7 @@ class SoftCrossEntropyLoss(nn.Module):
         loss = -pred * target
         loss = loss * mask.float()
         # print(loss, pred, target, mask)
-        return loss.sum() / (mask.sum() + self.eps)
+        return self.times * loss.sum() / (mask.sum() + self.eps)
 
 
 class Circumference(nn.Module):
