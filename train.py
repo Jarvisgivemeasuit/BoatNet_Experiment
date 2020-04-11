@@ -57,7 +57,7 @@ class Trainer:
 
         self.criterion1 = nn.CrossEntropyLoss().cuda()
         self.criterion2 = SoftCrossEntropyLoss(times=1).cuda()
-        self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, [20, 50, 70, 90], 0.2)
+        self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, [20, 50, 75, 90], 0.3)
         # self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, mode='min', factor=0.3, patience=3)
 
         self.Metric = namedtuple('Metric', 'pixacc miou kappa')
@@ -74,9 +74,16 @@ class Trainer:
         # self.writer_miou = SummaryWriter('dt_gcn/miou')
         # self.writer_kappa = SummaryWriter('dt_gcn/kappa')
 
-        self.writer_acc = SummaryWriter('dt/acc')
-        self.writer_miou = SummaryWriter('dt/miou')
-        self.writer_kappa = SummaryWriter('dt/kappa')
+        self.writer_acc = SummaryWriter(f'{self.args.board_dir}/acc')
+        self.writer_miou = SummaryWriter(f'{self.args.board_dir}/miou')
+        self.writer_kappa = SummaryWriter(f'{self.args.board_dir}/kappa')
+
+        self.writer_acc.add_scalar('train', self.train_metric.pixacc.get(), 0)
+        self.writer_miou.add_scalar('train', self.train_metric.miou.get(), 0)
+        self.writer_kappa.add_scalar('train', self.train_metric.kappa.get(), 0)
+        self.writer_acc.add_scalar('val', self.val_metric.pixacc.get(), 0)
+        self.writer_miou.add_scalar('val', self.val_metric.miou.get(), 0)
+        self.writer_kappa.add_scalar('val', self.val_metric.kappa.get(), 0)
 
     def training(self, epoch):
 
@@ -141,7 +148,7 @@ class Trainer:
             batch_time.update(time.time() - starttime)
             starttime = time.time()
 
-            bar.suffix = '({batch}/{size}) Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss:{loss:.4f},loss1:{loss1:.4f},loss2:{loss2:.4f} | Acc: {Acc: .4f} | mIoU: {mIoU: .4f} | kappa: {kappa: .4f}'.format(
+            bar.suffix = '({batch}/{size}) Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss:{loss:.4f},loss1:{loss1:.4f},loss2:{loss2:.4f} | Acc: {Acc:.4f} | mIoU: {mIoU:.4f} | kappa: {kappa:.4f}'.format(
                 batch=idx + 1,
                 size=len(self.train_loader),
                 bt=batch_time.avg,

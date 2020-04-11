@@ -16,7 +16,7 @@ def save_model(model, model_name, backbone, pred, miou, use_threshold, use_gcn):
     save_path = '/home/mist/model_saving/'
     # save_path = '/home/arron/Documents/grey/paper/model_saving/'
     # torch.save(model, os.path.join(save_path, "{}-{}-{:.3f}-{:.3f}_{}_{}.pth"
-    torch.save(model, os.path.join(save_path, "{}-{}_{}_{}_192.pth"
+    torch.save(model, os.path.join(save_path, "{}-{}_{}_{}.pth"
                                     .format(model_name, backbone, use_threshold, use_gcn)))
 
     print('saved model successful.')

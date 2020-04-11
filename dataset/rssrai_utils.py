@@ -237,12 +237,12 @@ class RandomImageSpliter:
         self.crop_size = crop_size
         self.valid_range_list = {}
 
-    def split_vd_image(self):
-        bar = Bar('spliting vd image:', max=500)
+    def split_vd_image(self, num_samples):
+        bar = Bar('spliting vd image:', max=num_samples)
         make_sure_path_exists(os.path.join(self.val_path, 'img'))
         make_sure_path_exists(os.path.join(self.val_path, 'label'))
 
-        for i in range(500):
+        for i in range(num_samples):
             img, label, information = self.random_crop()
             if information[0] not in self.valid_range_list:
                 self.valid_range_list[information[0]] = []
@@ -251,15 +251,15 @@ class RandomImageSpliter:
 
             np.save(os.path.join(self.val_path, 'img', f'{i}'), img)
             np.save(os.path.join(self.val_path, 'label', f'{i}'), label)
-            bar.suffix = f'{i + 1} / 500'
+            bar.suffix = f'{i + 1} / {num_samples}'
             bar.next()
         bar.finish()
         np.save(os.path.join(self.val_path, 'informations'), self.valid_range_list)
 
-    def split_tr_image(self):
+    def split_tr_image(self, num_samples):
         self.valid_range_list = np.load(os.path.join(self.val_path, 'informations.npy'), allow_pickle=True).item()
         i = 0
-        bar = Bar('spliting tr image:', max=15000)
+        bar = Bar('spliting tr image:', max=num_samples)
         make_sure_path_exists(os.path.join(self.train_path, 'img'))
         make_sure_path_exists(os.path.join(self.train_path, 'label'))
 
@@ -286,10 +286,10 @@ class RandomImageSpliter:
 
             np.save(os.path.join(self.train_path, 'img', f'{i}'), img)
             np.save(os.path.join(self.train_path, 'label', f'{i}'), label)
-            bar.suffix = f'{i + 1} / 15000'
+            bar.suffix = f'{i + 1} / {num_samples}'
             bar.next()
             i += 1
-            if i == 15000:
+            if i == num_samples:
                 break
         bar.finish()
 
@@ -564,15 +564,21 @@ if __name__ == '__main__':
     paths_obj = ProcessingPath()
     paths_dict = paths_obj.get_paths_dict(mode='all')
 
-    # spliter_paths = {}
+    spliter_paths = {}
     # spliter_paths['data_path'] = os.path.join(paths_dict['test_path'], 'img')
     # spliter_paths['data_path'] = paths_dict['ori_path']
     # spliter_paths['save_path'] = paths_dict['data_split_192']
+
+    # spliter_paths['data_path'] = paths_dict['ori_path']
+    # spliter_paths['train_path'] = paths_dict['train_split_256']
+    # spliter_paths['val_path'] = paths_dict['val_split_256']
     # spliter_paths['img_format'] = '.tif'
 
+    # spliter = RandomImageSpliter(spliter_paths)
+    # spliter.split_vd_image()
+    # spliter.split_tr_image()
     # spliter = ImageSpliter(spliter_paths, crop_size=(192, 192))
     # spliter = TestImageSpliter(spliter_paths)
-    # spliter.split_image()
 
     # transpose_paths = {}
     # transpose_paths['data_path'] = os.path.join(paths_dict['train_split_256'], 'label')
@@ -586,16 +592,16 @@ if __name__ == '__main__':
 
     # save_label_map(transpose_paths)
 
-    # ratios_paths = {}
+    ratios_paths = {}
     # ratios_paths['data_path'] = os.path.join(paths_dict['train_split_256'], 'mask')
     # ratios_paths['save_path'] = os.path.join(paths_dict['train_split_256'], 'ratios')
 
-    # ratios_paths['data_path'] = os.path.join(paths_dict['val_split_256'], 'mask')
-    # ratios_paths['save_path'] = os.path.join(paths_dict['val_split_256'], 'ratios')
+    ratios_paths['data_path'] = os.path.join(paths_dict['val_split_256'], 'mask')
+    ratios_paths['save_path'] = os.path.join(paths_dict['val_split_256'], 'ratios')
 
     # ratios_paths['data_path'] = os.path.join(paths_dict['train_split_192'], 'mask')
     # ratios_paths['save_path'] = os.path.join(paths_dict['train_split_192'], 'ratios')
-    # sta_ratios(ratios_paths)
+    sta_ratios(ratios_paths)
 
     # division_paths = {}
     # division_paths['source_path'] = paths_dict['data_split_192']
@@ -604,5 +610,5 @@ if __name__ == '__main__':
 
     # train_valid(division_paths)
 
-    data_path = os.path.join(paths_dict['data_split_192'], 'img')
-    print(mean_std(data_path))
+    # data_path = os.path.join(paths_dict['data_split_192'], 'img')
+    # print(mean_std(data_path))

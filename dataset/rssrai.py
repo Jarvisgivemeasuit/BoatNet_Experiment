@@ -27,16 +27,16 @@ class Rssrai(Dataset):
         self.std = std
 
         if self._mode == 'train':
-            self._image_dir = os.path.join(self._base_dir, 'train_split_192', 'img')
-            self._label_dir = os.path.join(self._base_dir, 'train_split_192', 'mask')
-            self._ratios_dir = os.path.join(self._base_dir, 'train_split_192', 'ratios')
+            self._image_dir = os.path.join(self._base_dir, 'train_split_256', 'img')
+            self._label_dir = os.path.join(self._base_dir, 'train_split_256', 'mask')
+            self._ratios_dir = os.path.join(self._base_dir, 'train_split_256', 'ratios')
             self._data_list = os.listdir(self._image_dir)
             self.len = len(self._data_list)
 
         if self._mode == 'val':
-            self._image_dir = os.path.join(self._base_dir, 'val_split_192', 'img')
-            self._label_dir = os.path.join(self._base_dir, 'val_split_192', 'mask')
-            self._ratios_dir = os.path.join(self._base_dir, 'val_split_192', 'ratios')
+            self._image_dir = os.path.join(self._base_dir, 'val_split_256', 'img')
+            self._label_dir = os.path.join(self._base_dir, 'val_split_256', 'mask')
+            self._ratios_dir = os.path.join(self._base_dir, 'val_split_256', 'ratios')
             self._data_list = os.listdir(self._image_dir)
             self.len = len(self._data_list)
 
