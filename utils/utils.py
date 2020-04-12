@@ -201,7 +201,7 @@ class SuperMerger:
     def merge_image(self):
         max_x, max_y = self.find_max_index()
         for ori_img_file in self.ori_list:
-            ori_img_name = ori_img_file.split('.')[0]
+            ori_img_name = ori_img_file.split('.')[0].strip()
             res = np.zeros((self.height, self.width, 3))
             for x in range(max_x):
                 for y in range(max_y):
@@ -259,7 +259,7 @@ class SuperMerger:
         for img_file in img_list:
             # print(img_file)
             img_name, x, y = self.get_image_message(img_file)
-            if self.ori_list[0].replace('.tif', '') == img_name[:-1]:
+            if self.ori_list[0].replace(' .tif', '') == img_name[:-1]:
                 xs.append(int(x))
                 ys.append(int(y))
         return max(xs), max(ys)
@@ -352,12 +352,15 @@ class FocalLoss(nn.Module):
 
 if __name__ == '__main__':
     # path = '/home/arron/dataset/rssrai_grey/rssrai/train/img'
-    path = '/home/arron/dataset/rssrai_grey/increase/rssrai/test'
-    save_path = '/home/arron/dataset/rssrai_grey/results/dt_resunet-resnet50' 
-    res_path = '/home/arron/dataset/rssrai_grey/results/tmp_output/dt_resunet-resnet50'
-    # supermerger = SuperMerger(path, res_path, save_path)
-    # print(supermerger.ori_list)
-    # supermerger.merge_image()
+    # path = '/home/arron/dataset/rssrai_grey/increase/rssrai/test'
+    # save_path = '/home/arron/dataset/rssrai_grey/results/dt_resunet-resnet50' 
+    # res_path = '/home/arron/dataset/rssrai_grey/results/tmp_output/dt_resunet-resnet50'
+
+    path = '/home/mist/rssrai/ori_img/val/img'
+    save_path = '/home/mist/results/unet-resnet50' 
+    res_path = '/home/mist/results/tmp'
+    supermerger = SuperMerger(path, res_path, save_path)
+    supermerger.merge_image()
 
 
     # lists = os.listdir(res_path)

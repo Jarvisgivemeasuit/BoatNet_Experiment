@@ -1,15 +1,17 @@
 import os
 import torch
 from model.dt_unet.dt_unet import Dt_UNet
+from model.pspnet.pspnet import PSPNet
+from model.deeplab.deeplab import DeepLabV3Plus
 
 
 def get_model(model_name, backbone, inplanes, num_classes, use_threshold, use_gcn):
-    if model_name == 'resunet':
-        return UNet(inplanes, num_classes, backbone)
+    if model_name == 'deeplab':
+        return DeepLabV3Plus(inplanes, num_classes, backbone)
     if model_name == 'pspnet':
-        return Dt_PSPNet(inplanes, num_classes, backbone, use_threshold, use_gcn)
+        return PSPNet(inplanes, num_classes, backbone, use_threshold, use_gcn)
     if model_name == 'unet':
-        return Dt_UNet(inplanes, num_classes, backbone, use_threshold, use_gcn)
+        return UNet(inplanes, num_classes, backbone, use_threshold, use_gcn)
 
 
 def save_model(model, model_name, backbone, pred, miou, use_threshold, use_gcn):

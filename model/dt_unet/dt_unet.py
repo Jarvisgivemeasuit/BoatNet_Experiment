@@ -5,7 +5,7 @@ import numpy as np
 from torchsummary import summary
 
 from . import torchvision_resnet
-from .dt_unet_utils import initialize_weights
+from .unet_utils import initialize_weights
 # import torchvision_resnet
 # from dt_unet_utils import *
 import torch.nn.functional as F

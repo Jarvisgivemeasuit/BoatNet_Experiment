@@ -5,9 +5,9 @@ import numpy as np
 from torchsummary import summary
 
 from . import torchvision_resnet
-from .dt_pspnet_utils import initialize_weights
+from .pspnet_utils import initialize_weights
 # import torchvision_resnet
-# from dt_unet_utils import *
+# from pspnet_utils import *
 import torch.nn.functional as F
 
 BACKBONE = 'resnet50'
@@ -96,7 +96,7 @@ class PPM(nn.Module):
         )
 
     def forward(self, x):
-        size = (x.shape(2), x.shape(3))
+        size = (x.shape[2], x.shape[3])
         ppm1 = F.interpolate(self.ppm1(x),
                              size=size,
                              mode='bilinear',
@@ -137,7 +137,7 @@ class Double_conv(nn.Module):
 class Pred_Fore_Rate(nn.Module):
     def __init__(self):
         super().__init__()
-        self.de_ratio = ChDecrease(2048, 128)
+        self.de_ratio = ChDecrease(512, 32)
         self.conv = nn.Sequential(
             nn.Conv2d(16, 16, 3, stride=2, padding=1),
             nn.BatchNorm2d(16),
@@ -157,7 +157,7 @@ class Pred_Fore_Rate(nn.Module):
         return x
 
 
-class Dt_PSPNet(nn.Module):
+class PSPNet(nn.Module):
     def __init__(self, inplanes, num_classes, backbone, use_threshold, use_gcn):
         super().__init__()
         self.backbone = Resnet(backbone, inplanes)
@@ -166,17 +166,26 @@ class Dt_PSPNet(nn.Module):
             Double_conv(1024, 512),
             nn.Dropout(p=0.1),
         )
+        self.ratios = Pred_Fore_Rate()
         self.out_conv = nn.Conv2d(512, num_classes, 1, bias=False)
+        self.use_threshold = use_threshold
 
     def forward(self, x):
         x = self.backbone(x)
+        if self.use_threshold:
+            output_ratios = self.ratios(x)
+
         x = self.ppm(x)
         x = self.ppm_conv(x)
         x = self.out_conv(x)
 
         out = F.interpolate(x,
-                            scale_factor=8,
+                            scale_factor=16,
                             mode='bilinear',
                             align_corners=True)
 
-        return out
+        return out, output_ratios
+
+
+# net = Dt_PSPNet(4, 16, 'resnet50', False, False)
+# summary(net.cuda(), (4, 256, 256))

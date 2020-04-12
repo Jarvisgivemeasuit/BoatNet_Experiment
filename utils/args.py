@@ -8,9 +8,9 @@ class Args:
         self.num_workers = 8
         self.inplanes = 4
 
-        self.use_threshold = True
+        self.use_threshold = False
         self.use_gcn = False
-        self.model_name = 'pspnet'
+        self.model_name = 'unet'
         self.backbone = 'resnet50'
 
         self.epochs = 100
@@ -24,5 +24,5 @@ class Args:
         self.apex = True
 
         self.vis_image_dir = '/home/mist/vis_image/'
-        self.board_dir = 'dt'
+        self.board_dir = 'deeplab_base'
         # self.vis_image_dir = '/home/arron/Documents/grey/paper/vis_image/'

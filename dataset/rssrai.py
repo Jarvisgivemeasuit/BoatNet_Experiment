@@ -42,6 +42,8 @@ class Rssrai(Dataset):
 
         if self._mode == 'test':
             self._image_dir = os.path.join(self._base_dir, 'test_split_256', 'img')
+            self._label_dir = os.path.join(self._base_dir, 'test_split_256', 'mask')
+            self._ratios_dir = os.path.join(self._base_dir, 'test_split_256', 'ratios')
             self._data_list = os.listdir(self._image_dir)
             self.len = len(self._data_list)
 
@@ -49,10 +51,11 @@ class Rssrai(Dataset):
         return self.len
 
     def __getitem__(self, idx):
-        if self._mode != "test":
-            return self.load_numpy(idx, self._mode)
-        else:
-            return self.load_test_numpy(idx)
+        return self.load_numpy(idx, self._mode)
+        # if self._mode != "test":
+        #     return self.load_numpy(idx, self._mode)
+        # else:
+        #     return self.load_test_numpy(idx)
 
     def load_test_numpy(self, idx):
         img = np.load(os.path.join(self._image_dir, self._data_list[idx]))
@@ -73,6 +76,7 @@ class Rssrai(Dataset):
 
         sample['image'] = sample['image'].transpose((2, 0, 1))
         sample['ratios'] = np.array(ratios[:, 0])
+        sample['file'] = self._data_list[idx]
 
         return sample
 

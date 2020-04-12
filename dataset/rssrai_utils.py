@@ -106,7 +106,7 @@ class ProcessingPath:
             self.paths_dict['train_split_256'] = os.path.join(self.root_path, 'train_split_256')
             self.paths_dict['val_split_256'] = os.path.join(self.root_path, 'val_split_256')
 
-            self.paths_dict['test_path'] = os.path.join(self.root_path, 'ori_img', 'test')
+            self.paths_dict['test_path'] = os.path.join(self.root_path, 'ori_img', 'val')
             self.paths_dict['test_split_256'] = os.path.join(self.root_path, 'test_split_256')
 
         return self.paths_dict
@@ -323,20 +323,39 @@ class TestImageSpliter:
         self.save_path = path_dict['save_path']
         self.crop_size = crop_size
         self.img_format = path_dict['img_format']
+        make_sure_path_exists(os.path.join(self.save_path, 'img'))
+        make_sure_path_exists(os.path.join(self.save_path, 'label'))
 
     def get_data_list(self):
         return self.data_list
 
+    # def split_image(self):
+    #     img_list = os.listdir(os.path.join(self.data_path))
+
+    #     for i, img_file in enumerate(img_list):
+    #         img_name = img_file.replace('.tif', '')
+
+    #         img_obj = TIFF.open(os.path.join(self.data_path, img_file))
+    #         img = img_obj.read_image().transpose((2, 0, 1))
+
+    #         self._img_crop(img, img_name, i, 'image')
+    #     print('Sample split all complete.')
+
     def split_image(self):
-        img_list = os.listdir(os.path.join(self.data_path))
+        img_list = os.listdir(os.path.join(self.data_path, 'img'))
+        num_imgs = len(img_list)
 
         for i, img_file in enumerate(img_list):
-            img_name = img_file.replace('.tif', '')
+            img_name = img_file.replace(' .tif', '')
+            label_name = "_".join([img_name, 'label'])
+            label_file = "".join([label_name, self.img_format])
 
-            img_obj = TIFF.open(os.path.join(self.data_path, img_file))
-            img = img_obj.read_image().transpose((2, 0, 1))
+            img_obj = TIFF.open(os.path.join(self.data_path, 'img', img_file))
+            label_obj = TIFF.open(os.path.join(self.data_path, 'label', label_file))
+            img, label = img_obj.read_image().transpose((2, 0, 1)), label_obj.read_image().transpose((2, 0, 1))
 
-            self._img_crop(img, img_name, i, 'image')
+            self._img_crop(img, img_name, i, 'img')
+            self._img_crop(label, label_name, i, 'label')
         print('Sample split all complete.')
 
     def _img_crop(self, img, img_name, i, tp):
@@ -361,9 +380,8 @@ class TestImageSpliter:
                 else:
                     split_image = img[:, x:x + len_x, y:y + len_y]
 
-                if tp == 'image':
-                    split_image_name = '_'.join([img_name, str(row_count), str(col_count)])
-                    np.save(os.path.join(self.save_path, split_image_name), split_image)
+                split_image_name = '_'.join([img_name.replace('_label', ''), str(row_count), str(col_count)])
+                np.save(os.path.join(self.save_path, tp, split_image_name), split_image)
 
                 # print(" ", height, width, row_count, col_count)
                 if y == width:
@@ -565,27 +583,33 @@ if __name__ == '__main__':
     paths_dict = paths_obj.get_paths_dict(mode='all')
 
     spliter_paths = {}
-    # spliter_paths['data_path'] = os.path.join(paths_dict['test_path'], 'img')
+    spliter_paths['data_path'] = paths_dict['test_path']
+    spliter_paths['save_path'] = paths_dict['test_split_256']
+
     # spliter_paths['data_path'] = paths_dict['ori_path']
     # spliter_paths['save_path'] = paths_dict['data_split_192']
 
     # spliter_paths['data_path'] = paths_dict['ori_path']
     # spliter_paths['train_path'] = paths_dict['train_split_256']
     # spliter_paths['val_path'] = paths_dict['val_split_256']
-    # spliter_paths['img_format'] = '.tif'
+    spliter_paths['img_format'] = '.tif'
 
     # spliter = RandomImageSpliter(spliter_paths)
     # spliter.split_vd_image()
     # spliter.split_tr_image()
     # spliter = ImageSpliter(spliter_paths, crop_size=(192, 192))
     # spliter = TestImageSpliter(spliter_paths)
+    # spliter.split_image()
 
-    # transpose_paths = {}
+    transpose_paths = {}
     # transpose_paths['data_path'] = os.path.join(paths_dict['train_split_256'], 'label')
     # transpose_paths['save_path'] = os.path.join(paths_dict['train_split_256'], 'mask')
 
     # transpose_paths['data_path'] = os.path.join(paths_dict['val_split_256'], 'label')
     # transpose_paths['save_path'] = os.path.join(paths_dict['val_split_256'], 'mask')
+
+    transpose_paths['data_path'] = os.path.join(paths_dict['test_split_256'], 'label')
+    transpose_paths['save_path'] = os.path.join(paths_dict['test_split_256'], 'mask')
 
     # transpose_paths['data_path'] = os.path.join(paths_dict['data_split_192'], 'label')
     # transpose_paths['save_path'] = os.path.join(paths_dict['data_split_192'], 'mask')
@@ -596,12 +620,15 @@ if __name__ == '__main__':
     # ratios_paths['data_path'] = os.path.join(paths_dict['train_split_256'], 'mask')
     # ratios_paths['save_path'] = os.path.join(paths_dict['train_split_256'], 'ratios')
 
-    ratios_paths['data_path'] = os.path.join(paths_dict['val_split_256'], 'mask')
-    ratios_paths['save_path'] = os.path.join(paths_dict['val_split_256'], 'ratios')
+    # ratios_paths['data_path'] = os.path.join(paths_dict['val_split_256'], 'mask')
+    # ratios_paths['save_path'] = os.path.join(paths_dict['val_split_256'], 'ratios')
+
+    ratios_paths['data_path'] = os.path.join(paths_dict['test_split_256'], 'mask')
+    ratios_paths['save_path'] = os.path.join(paths_dict['test_split_256'], 'ratios')
 
     # ratios_paths['data_path'] = os.path.join(paths_dict['train_split_192'], 'mask')
     # ratios_paths['save_path'] = os.path.join(paths_dict['train_split_192'], 'ratios')
-    sta_ratios(ratios_paths)
+    # sta_ratios(ratios_paths)
 
     # division_paths = {}
     # division_paths['source_path'] = paths_dict['data_split_192']
