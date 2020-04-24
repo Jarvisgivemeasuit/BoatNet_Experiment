@@ -194,7 +194,7 @@ class ChDecrease(nn.Module):
         return x
 
 
-class Dt_UNet(nn.Module):
+class UNet(nn.Module):
     def __init__(self, inplanes, num_classes, backbone, use_threshold, use_gcn):
         super().__init__()
         self.down = ResDown(in_channels=inplanes, backbone=backbone)

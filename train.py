@@ -57,7 +57,7 @@ class Trainer:
 
         self.criterion1 = nn.CrossEntropyLoss().cuda()
         self.criterion2 = SoftCrossEntropyLoss(times=1).cuda()
-        self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, [20, 50, 75, 90], 0.3)
+        self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, [30, 50, 75, 90], 0.1)
         # self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, mode='min', factor=0.3, patience=3)
 
         self.Metric = namedtuple('Metric', 'pixacc miou kappa')

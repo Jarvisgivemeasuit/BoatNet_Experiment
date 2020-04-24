@@ -70,7 +70,7 @@ class Path: # 租借服务器路径
     @staticmethod
     def get_root_path(dataset_name):
         if dataset_name == 'rssrai_grey':
-            return '/home/mist/rssrai/'
+            return '/home/grey/datasets/rssrai/'
 
 
 class ProcessingPath:
@@ -99,7 +99,7 @@ class ProcessingPath:
             self.paths_dict['val_split_256'] = os.path.join(self.root_path, 'val_split_256', 'label')
 
         else:
-            self.paths_dict['ori_path'] = os.path.join(self.root_path, 'ori_img', 'train')
+            self.paths_dict['ori_path'] = os.path.join(self.root_path, 'train')
             self.paths_dict['data_split_192'] = os.path.join(self.root_path, 'data_split_192')
             self.paths_dict['train_split_192'] = os.path.join(self.root_path, 'train_split_192')
             self.paths_dict['val_split_192'] = os.path.join(self.root_path, 'val_split_192')
@@ -163,9 +163,6 @@ class ImageSpliter:
         self.save_path = path_dict['save_path']
         self.crop_size = crop_size
         self.img_format = path_dict['img_format']
-
-    def get_data_list(self):
-        return self.data_list
 
     def split_image(self):
         img_list = os.listdir(os.path.join(self.data_path, 'img'))
@@ -236,16 +233,29 @@ class RandomImageSpliter:
         self.val_path = path_dict['val_path']
         self.crop_size = crop_size
         self.valid_range_list = {}
+        self.test_range_list = {'GF2_PMS1__20150212_L1A0000647768-MSS1_label.tif': [[500, 1600]],
+                    'GF2_PMS1__20150902_L1A0001015649-MSS1_label.tif': [[5800, 5800]],
+                    'GF2_PMS1__20160327_L1A0001491417-MSS1_label.tif': [[4300, 1400],[2100, 1200]],
+                    'GF2_PMS2__20160510_L1A0001573999-MSS2_label.tif': [[5800, 6200]],
+                    'GF2_PMS1__20160827_L1A0001793003-MSS1_label.tif': [[2200, 3000],[0, 4400]],
+                    'GF2_PMS1__20151203_L1A0001217916-MSS1_label.tif': [[2000, 1800],[1000, 5900]],
+                                'size':[1000, 1000]}
+        self.ori_img_list = {}
 
     def split_vd_image(self, num_samples):
         bar = Bar('spliting vd image:', max=num_samples)
         make_sure_path_exists(os.path.join(self.val_path, 'img'))
         make_sure_path_exists(os.path.join(self.val_path, 'label'))
+        i = 0
+        while True:
+            img, label, information = self.random_crop(mode='val')
 
-        for i in range(num_samples):
-            img, label, information = self.random_crop()
+            # if ((label == 0).sum(axis=0) == 3).sum() / (self.crop_size[0] * self.crop_size[1]) > 0.8:
+            #     continue
+
             if information[0] not in self.valid_range_list:
                 self.valid_range_list[information[0]] = []
+                self.valid_range_list[information[0]].append(information[1:])
             else:
                 self.valid_range_list[information[0]].append(information[1:])
 
@@ -253,6 +263,10 @@ class RandomImageSpliter:
             np.save(os.path.join(self.val_path, 'label', f'{i}'), label)
             bar.suffix = f'{i + 1} / {num_samples}'
             bar.next()
+
+            i += 1
+            if i == num_samples:
+                break
         bar.finish()
         np.save(os.path.join(self.val_path, 'informations'), self.valid_range_list)
 
@@ -264,24 +278,28 @@ class RandomImageSpliter:
         make_sure_path_exists(os.path.join(self.train_path, 'label'))
 
         while True:
-            img, label, information = self.random_crop()
-            ranges = np.array(self.valid_range_list[information[0]]).copy()
+            if i < num_samples * 0.6:
+                img, label, information = self.random_crop(mode='val', condition=True)
+            else:
+                img, label, information = self.random_crop(condition=True)
+            if information[0] in self.valid_range_list:
+                ranges = np.array(self.valid_range_list[information[0]]).copy()
+                ranges[:, 0][ranges[:, 0] < information[1]] = information[1]
+                ranges[:, 1][ranges[:, 1] < information[2]] = information[2]
+                xmin = ranges[:, 0]
+                ymin = ranges[:, 1]
 
-            ranges[:, 0][ranges[:, 0] < information[1]] = information[1]
-            ranges[:, 1][ranges[:, 1] > information[2]] = information[2]
-            x1 = ranges[:, 0]
-            y1 = ranges[:, 1]
+                ranges = np.array(self.valid_range_list[information[0]]).copy()
+                ranges[:, 0] = ranges[:, 0] + self.crop_size[0]
+                ranges[:, 1] = ranges[:, 1] + self.crop_size[1]
+                ranges[:, 0][ranges[:, 0] > information[1] + self.crop_size[0]] = information[1] + self.crop_size[0]
+                ranges[:, 1][ranges[:, 1] > information[2] + self.crop_size[1]] = information[2] + self.crop_size[1]
+                xmax = ranges[:, 0]
+                ymax = ranges[:, 1]
 
-            ranges = np.array(self.valid_range_list[information[0]]).copy()
-
-            ranges[:, 0] = ranges[:, 0] + self.crop_size[0]
-            ranges[:, 1] = ranges[:, 1] + self.crop_size[1]
-            ranges[:, 0][ranges[:, 0] > information[1] + self.crop_size[0]] = information[1] + self.crop_size[0]
-            ranges[:, 1][ranges[:, 1] > information[2] + self.crop_size[1]] = information[2] + self.crop_size[1]
-            x2 = ranges[:, 0]
-            y2 = ranges[:, 1]
-
-            if (x1 - x2 > 0).sum() > 0 and (y1 - y2 > 0).sum() > 0:
+                if (xmax - xmin > 0).sum() > 0 and (ymax - ymin > 0).sum() > 0:
+                    continue
+            if ((label == 0).sum(axis=0) == 3).sum() / (self.crop_size[0] * self.crop_size[1]) > 0.8:
                 continue
 
             np.save(os.path.join(self.train_path, 'img', f'{i}'), img)
@@ -292,26 +310,56 @@ class RandomImageSpliter:
             if i == num_samples:
                 break
         bar.finish()
+        np.savez('/home/grey/datasets/rssrai/crop_condition', self.ori_img_list)
 
-    def random_crop(self):
-        img_path = os.path.join(self.data_path, 'img')
-        label_path = os.path.join(self.data_path, 'label')
+    def random_crop(self, mode='train',condition=False):
+        if mode == 'train':
+            img_path = os.path.join(self.data_path, 'img')
+            label_path = os.path.join(self.data_path, 'label')
+        else:
+            img_path = '/home/grey/datasets/rssrai/rssrai2019_semantic_segmentation/img'
+            label_path = '/home/grey/datasets/rssrai/rssrai2019_semantic_segmentation/label'
 
         file_list = os.listdir(img_path)
         for file in file_list:
             if file[-3:] != 'tif':
                 file_list.remove(file)
         img_file = random.choice(file_list)
-        label_file = img_file.replace(' .tif', '_label.tif')
-
+        label_file = img_file.replace('.tif', '_label.tif')
+        
         img_obj = TIFF.open(os.path.join(img_path, img_file))
         img = img_obj.read_image()
         label_obj = TIFF.open(os.path.join(label_path, label_file))
         label = label_obj.read_image()
 
-        topY = np.random.randint(img.shape[0] - self.crop_size[0])
-        leftX = np.random.randint(img.shape[1] - self.crop_size[1])
+        if label_file in self.test_range_list:
+            for index in self.test_range_list[label_file]:
+                reg_size = self.test_range_list['size']
+                while True:
+                    topY = np.random.randint(img.shape[0] - self.crop_size[0])
+                    leftX = np.random.randint(img.shape[1] - self.crop_size[1])
+
+                    xmin = max(topY, index[0])
+                    ymin = max(leftX, index[1])
+                    xmax = min(topY + self.crop_size[0], index[0] + reg_size[0])
+                    ymax = min(leftX + self.crop_size[1], index[1] + reg_size[1])
+
+                    inter = max(0, (xmax - xmin)) * max(0, (ymax - ymin))
+                    if inter == 0:
+                        break
+                    else:
+                        continue
+        else:
+            topY = np.random.randint(img.shape[0] - self.crop_size[0])
+            leftX = np.random.randint(img.shape[1] - self.crop_size[1])
         
+        if condition:
+            if img_file not in self.ori_img_list:
+                self.ori_img_list[img_file] = np.zeros(label.shape[:2])
+                self.ori_img_list[img_file][topY:topY + self.crop_size[0], leftX:leftX + self.crop_size[1]] += 1
+            else:
+                self.ori_img_list[img_file][topY:topY + self.crop_size[0], leftX:leftX + self.crop_size[1]] += 1
+
         crop_image = img[topY:topY + self.crop_size[0], leftX:leftX + self.crop_size[1], :].transpose((2, 0, 1))
         crop_label = label[topY:topY + self.crop_size[0], leftX:leftX + self.crop_size[1], :].transpose((2, 0, 1))
         return crop_image, crop_label, [img_file, topY, leftX]
@@ -325,9 +373,6 @@ class TestImageSpliter:
         self.img_format = path_dict['img_format']
         make_sure_path_exists(os.path.join(self.save_path, 'img'))
         make_sure_path_exists(os.path.join(self.save_path, 'label'))
-
-    def get_data_list(self):
-        return self.data_list
 
     # def split_image(self):
     #     img_list = os.listdir(os.path.join(self.data_path))
@@ -524,8 +569,6 @@ def sta_ratios(path_dict):
 
     for i, mask_file in enumerate(img_list):
         mask = np.load(os.path.join(path_dict['data_path'], mask_file))
-
-        back = (mask == 15).sum()
         ratios = np.zeros([NUM_CLASSES, 2])
         for category in range(NUM_CLASSES):
             ratios[category, 0] = (mask == category).sum() / mask.size
@@ -537,6 +580,24 @@ def sta_ratios(path_dict):
         bar.suffix = f'{i + 1} / {num_imgs}'
         bar.next()
     bar.finish()
+
+
+def distributing(path):
+    img_list = os.listdir(path)
+    num_imgs = len(img_list)
+    bar = Bar('distributing:', max=num_imgs)
+    dis = np.zeros(NUM_CLASSES)
+
+    for i, mask_file in enumerate(img_list):
+        mask = np.load(os.path.join(path, mask_file))
+        for category in range(NUM_CLASSES):
+            dis[category] += (mask == category).sum()
+            # print(ratios[category])
+        
+        bar.suffix = f'{i + 1} / {num_imgs}'
+        bar.next()
+    bar.finish()
+    print(dis)
 
 
 #  计算所有图片像素的均值并调用std
@@ -583,33 +644,33 @@ if __name__ == '__main__':
     paths_dict = paths_obj.get_paths_dict(mode='all')
 
     spliter_paths = {}
-    spliter_paths['data_path'] = paths_dict['test_path']
-    spliter_paths['save_path'] = paths_dict['test_split_256']
+    # spliter_paths['data_path'] = paths_dict['test_path']
+    # spliter_paths['save_path'] = paths_dict['test_split_256']
 
     # spliter_paths['data_path'] = paths_dict['ori_path']
     # spliter_paths['save_path'] = paths_dict['data_split_192']
 
-    # spliter_paths['data_path'] = paths_dict['ori_path']
-    # spliter_paths['train_path'] = paths_dict['train_split_256']
-    # spliter_paths['val_path'] = paths_dict['val_split_256']
+    spliter_paths['data_path'] = paths_dict['ori_path']
+    spliter_paths['train_path'] = paths_dict['train_split_256']
+    spliter_paths['val_path'] = paths_dict['val_split_256']
     spliter_paths['img_format'] = '.tif'
 
     # spliter = RandomImageSpliter(spliter_paths)
-    # spliter.split_vd_image()
-    # spliter.split_tr_image()
+    # spliter.split_vd_image(300)
+    # spliter.split_tr_image(20000)
     # spliter = ImageSpliter(spliter_paths, crop_size=(192, 192))
     # spliter = TestImageSpliter(spliter_paths)
     # spliter.split_image()
 
     transpose_paths = {}
-    # transpose_paths['data_path'] = os.path.join(paths_dict['train_split_256'], 'label')
-    # transpose_paths['save_path'] = os.path.join(paths_dict['train_split_256'], 'mask')
+    transpose_paths['data_path'] = os.path.join(paths_dict['train_split_256'], 'label')
+    transpose_paths['save_path'] = os.path.join(paths_dict['train_split_256'], 'mask')
 
     # transpose_paths['data_path'] = os.path.join(paths_dict['val_split_256'], 'label')
     # transpose_paths['save_path'] = os.path.join(paths_dict['val_split_256'], 'mask')
 
-    transpose_paths['data_path'] = os.path.join(paths_dict['test_split_256'], 'label')
-    transpose_paths['save_path'] = os.path.join(paths_dict['test_split_256'], 'mask')
+    # transpose_paths['data_path'] = os.path.join(paths_dict['test_split_256'], 'label')
+    # transpose_paths['save_path'] = os.path.join(paths_dict['test_split_256'], 'mask')
 
     # transpose_paths['data_path'] = os.path.join(paths_dict['data_split_192'], 'label')
     # transpose_paths['save_path'] = os.path.join(paths_dict['data_split_192'], 'mask')
@@ -617,18 +678,18 @@ if __name__ == '__main__':
     # save_label_map(transpose_paths)
 
     ratios_paths = {}
-    # ratios_paths['data_path'] = os.path.join(paths_dict['train_split_256'], 'mask')
-    # ratios_paths['save_path'] = os.path.join(paths_dict['train_split_256'], 'ratios')
+    ratios_paths['data_path'] = os.path.join(paths_dict['train_split_256'], 'mask')
+    ratios_paths['save_path'] = os.path.join(paths_dict['train_split_256'], 'ratios')
 
     # ratios_paths['data_path'] = os.path.join(paths_dict['val_split_256'], 'mask')
     # ratios_paths['save_path'] = os.path.join(paths_dict['val_split_256'], 'ratios')
 
-    ratios_paths['data_path'] = os.path.join(paths_dict['test_split_256'], 'mask')
-    ratios_paths['save_path'] = os.path.join(paths_dict['test_split_256'], 'ratios')
+    # ratios_paths['data_path'] = os.path.join(paths_dict['test_split_256'], 'mask')
+    # ratios_paths['save_path'] = os.path.join(paths_dict['test_split_256'], 'ratios')
 
     # ratios_paths['data_path'] = os.path.join(paths_dict['train_split_192'], 'mask')
     # ratios_paths['save_path'] = os.path.join(paths_dict['train_split_192'], 'ratios')
-    # sta_ratios(ratios_paths)
+    sta_ratios(ratios_paths)
 
     # division_paths = {}
     # division_paths['source_path'] = paths_dict['data_split_192']
@@ -639,3 +700,18 @@ if __name__ == '__main__':
 
     # data_path = os.path.join(paths_dict['data_split_192'], 'img')
     # print(mean_std(data_path))
+
+    # dis_path = os.path.join(paths_dict['val_split_256'], 'mask')
+    # distributing(dis_path)
+
+('GF2_PMS1__20150212_L1A0000647768-MSS1_label.tif', 500, 1600)
+('GF2_PMS1__20150902_L1A0001015649-MSS1_label.tif', 5800, 5800)
+('GF2_PMS1__20160327_L1A0001491417-MSS1_label.tif', 4300, 1400)
+('GF2_PMS1__20160327_L1A0001491417-MSS1_label.tif', 2100, 1200)
+('GF2_PMS2__20160510_L1A0001573999-MSS2_label.tif', 5800, 6200)
+('GF2_PMS1__20160827_L1A0001793003-MSS1_label.tif', 2200, 3000)
+('GF2_PMS1__20160827_L1A0001793003-MSS1_label.tif', 0, 4400)
+('GF2_PMS1__20160827_L1A0001793003(2)-MSS1_label.tif', 2200, 3000)
+('GF2_PMS1__20160827_L1A0001793003(2)-MSS1_label.tif', 0, 4400)
+('GF2_PMS1__20151203_L1A0001217916-MSS1_label.tif', 2000, 1800)
+('GF2_PMS1__20151203_L1A0001217916-MSS1_label.tif', 1000, 5900)

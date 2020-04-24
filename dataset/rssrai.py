@@ -80,13 +80,6 @@ class Rssrai(Dataset):
 
         return sample
 
-    def load_img(self, idx):
-        sample = self._read_data(self._label_file_list[idx])
-        sample = self._valid_enhance(sample)
-        sample['image'] = np.transpose(np.array(sample['image'],dtype='float32'), (2, 0, 1))
-        
-        return sample
-
     def _read_data(self, label_name):
         image_name = label_name.replace("_label", "")
         image_pil = Image.open(os.path.join(self._image_dir, image_name))
