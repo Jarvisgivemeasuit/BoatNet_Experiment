@@ -195,13 +195,14 @@ class ChDecrease(nn.Module):
 
 
 class UNet(nn.Module):
-    def __init__(self, inplanes, num_classes, backbone, use_threshold, use_gcn):
+    def __init__(self, inplanes, num_classes, backbone, use_threshold, use_gcn, bilinear=True):
         super().__init__()
         self.down = ResDown(in_channels=inplanes, backbone=backbone)
         self.backbone = backbone
         self.num_classes = num_classes
         self.use_threshold = use_threshold
         self.use_gcn = use_gcn
+        self.bilinear = bilinear
 
         if self.backbone not in ['resnet18', 'resnet34']:
             self.de1 = ChDecrease(256, 4)
@@ -229,11 +230,11 @@ class UNet(nn.Module):
             self.up4 = Up(64 + NUM_CLASSES, 128 + NUM_CLASSES, 64)
             self.up5 = Up(64, 68, 64)
         else:
-            self.up1 = Up(512, 768, 256)
-            self.up2 = Up(256, 384, 128)
-            self.up3 = Up(128, 192, 64)
-            self.up4 = Up(64, 128, 64, last_cat=True)
-            self.up5 = Up(64, 68, 64)
+            self.up1 = Up(512, 768, 256, bilinear=self.bilinear)
+            self.up2 = Up(256, 384, 128, bilinear=self.bilinear)
+            self.up3 = Up(128, 192, 64, bilinear=self.bilinear)
+            self.up4 = Up(64, 128, 64, bilinear=self.bilinear, last_cat=True)
+            self.up5 = Up(64, 68, 64, bilinear=self.bilinear)
 
         self.outconv = Double_conv(64, self.num_classes)
 

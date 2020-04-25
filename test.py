@@ -209,9 +209,9 @@ class Tester:
 
 def test():
     save_result_path = '/home/mist/results/'
-    param_path = '/home/mist/model_saving/unet-resnet50_True_False.pth'
-    # torch.load(param_path)
-    tester = Tester(Args, param_path, save_result_path, 48, use_threshold=True)
+    param_path = '/home/mist/rssrai_model_saving/unet-resnet50_False_False.pth'
+    torch.load(param_path)
+    tester = Tester(Args, param_path, save_result_path, 48, use_threshold=False)
 
     print("==> Start testing")
     tester.testing()

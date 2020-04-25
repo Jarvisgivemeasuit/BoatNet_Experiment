@@ -15,7 +15,8 @@ def get_model(model_name, backbone, inplanes, num_classes, use_threshold, use_gc
 
 
 def save_model(model, model_name, backbone, pred, miou, use_threshold, use_gcn):
-    save_path = '/home/grey/Documents/rssrai_model_saving/'
+    # save_path = '/home/grey/Documents/rssrai_model_saving/'
+    save_path = '/home/mist/rssrai_model_saving/'
     make_sure_path_exists(save_path)
     # save_path = '/home/arron/Documents/grey/paper/model_saving/'
     # torch.save(model, os.path.join(save_path, "{}-{}-{:.3f}-{:.3f}_{}_{}.pth"

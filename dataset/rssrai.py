@@ -41,9 +41,12 @@ class Rssrai(Dataset):
             self.len = len(self._data_list)
 
         if self._mode == 'test':
-            self._image_dir = os.path.join(self._base_dir, 'test_split_256', 'img')
-            self._label_dir = os.path.join(self._base_dir, 'test_split_256', 'mask')
-            self._ratios_dir = os.path.join(self._base_dir, 'test_split_256', 'ratios')
+            # self._image_dir = os.path.join(self._base_dir, 'test_split', 'img')
+            # self._label_dir = os.path.join(self._base_dir, 'test_split', 'mask')
+            # self._ratios_dir = os.path.join(self._base_dir, 'test_split', 'ratios')
+            self._image_dir = os.path.join(self._base_dir, 'test', 'img')
+            self._label_dir = os.path.join(self._base_dir, 'test', 'mask')
+            self._ratios_dir = os.path.join(self._base_dir, 'test', 'ratios')
             self._data_list = os.listdir(self._image_dir)
             self.len = len(self._data_list)
 
@@ -100,12 +103,12 @@ class Rssrai(Dataset):
 
     def _train_enhance(self, sample):
         compose = A.Compose([
-            # A.ShiftScaleRotate(),
-            # A.RGBShift(),
-            # A.Blur(),
-            # A.GaussNoise(),
-            # A.ElasticTransform(),
-            # A.Cutout(p=1),
+            # A.ShiftScaleRotate(p=0.5),
+            # A.RGBShift(p=0.5),
+            # A.Blur(p=0.5),
+            # A.GaussNoise(p=0.5),
+            # A.ElasticTransform(p=0.5),
+            # A.Cutout(p=0.5),
             A.Normalize(mean=self.mean, std=self.std, p=1),
         ], additional_targets={'image': 'image', 'label': 'mask'})
         sample['image'] = sample['image'].transpose((1, 2, 0))

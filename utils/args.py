@@ -3,8 +3,8 @@ import os
 class Args:
 
     def __init__(self):
-        self.tr_batch_size = 16
-        self.vd_batch_size = 22
+        self.tr_batch_size = 48
+        self.vd_batch_size = 48
         self.num_workers = 8
         self.inplanes = 4
 
@@ -23,6 +23,6 @@ class Args:
         self.cuda = torch.cuda.is_available()
         self.apex = True
 
-        self.vis_image_dir = '/home/grey/datasets/rssrai/vis_image/'
+        self.vis_image_dir = '/home/mist/rssrai/vis_image/'
         self.board_dir = 'unet_base'
         # self.vis_image_dir = '/home/arron/Documents/grey/paper/vis_image/'
