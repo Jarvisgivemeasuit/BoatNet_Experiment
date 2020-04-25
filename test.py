@@ -28,7 +28,7 @@ class Tester:
         self.batch_size = batch_size
         self.use_threshold = use_threshold
 
-        self.test_set = Rssrai(mode='val')
+        self.test_set = Rssrai(mode='test')
         self.num_classes = self.test_set.NUM_CLASSES
         self.test_loader = DataLoader(self.test_set, batch_size=self.batch_size, shuffle=False, num_workers=8)
 
@@ -39,8 +39,8 @@ class Tester:
         self.save_path = make_sure_path_exists(os.path.join(save_path, "tmp"))
         self.final_save_path = make_sure_path_exists(os.path.join(save_path, "unet-resnet50"))
         self.Metric = namedtuple('Metric', 'pixacc miou kappa')
-        self.mean = (0.52891074, 0.38070734, 0.40119018, 0.36884733)
-        self.std = (0.24007008, 0.23784, 0.22267079, 0.21865861)
+        self.mean = (0.52179472, 0.36677649, 0.39002522, 0.35391396)
+        self.std = (0.25901934, 0.25514357, 0.23966101, 0.23451189)
         self.val_metric = self.Metric(pixacc=metrics.PixelAccuracy(),
                                 miou=metrics.MeanIoU(self.num_classes),
                                 kappa=metrics.Kappa(self.num_classes))
@@ -128,7 +128,7 @@ class Tester:
         starttime = time.time()
 
         num_val = len(self.test_loader)
-        bar = Bar('Validation', max=num_val)
+        bar = Bar('Testing', max=num_val)
 
         if isinstance(self.net, torch.nn.DataParallel):
             self.net = self.net.module
@@ -172,7 +172,7 @@ class Tester:
             batch_time.update(time.time() - starttime)
             starttime = time.time()
 
-            bar.suffix = '({batch}/{size}) Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss: {loss:.4f},loss1: {loss1:.4f},loss2: {loss2:.4f}| Acc: {Acc: .4f} | mIoU: {mIoU: .4f} | kappa: {kappa: .4f}'.format(
+            bar.suffix = '({batch}/{size}) Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss: {loss:.4f},loss1: {loss1:.4f},loss2: {loss2:.4f}| Acc: {Acc:.4f} | mIoU: {mIoU: .4f},maxIoU:{maxIoU:.4f},idx:{index1},minIoU:{minIoU:.4f},idx:{index2} | kappa: {kappa: .4f}'.format(
                 batch=idx + 1,
                 size=len(self.test_loader),
                 bt=batch_time.avg,
@@ -181,7 +181,11 @@ class Tester:
                 loss=losses.avg,
                 loss1=losses1.avg,
                 loss2=losses2.avg,
-                mIoU=self.val_metric.miou.get(),
+                mIoU=self.val_metric.miou.get()[0],
+                maxIoU=self.val_metric.miou.get()[1],
+                index1=self.val_metric.miou.get()[2][0],
+                minIoU=self.val_metric.miou.get()[3],
+                index2=self.val_metric.miou.get()[4][0],
                 Acc=self.val_metric.pixacc.get(),
                 kappa=self.val_metric.kappa.get()
             )

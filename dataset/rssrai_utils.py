@@ -513,6 +513,11 @@ def label_indices(mask):
 
 def save_label_map(paths_dict):
     label_list = os.listdir(paths_dict['data_path'])
+    for label_file in label_list:
+        if label_file[-3:] != 'npy':
+            label_list.remove(label_file)
+        
+
     num_labels = len(label_list)
     bar = Bar("Transposing label to segmap: ", max=num_labels)
     make_sure_path_exists(os.path.join(paths_dict['save_path']))
@@ -520,7 +525,7 @@ def save_label_map(paths_dict):
     for i, label_file in enumerate(label_list):
         label = np.load(os.path.join(paths_dict['data_path'], label_file))
         mask = label_indices(label)
-
+        label_file = label_file.replace('_label', '')
         np.save(os.path.join(paths_dict['save_path'], label_file), mask)
         
         bar.suffix = f'{i + 1} / {num_labels}'
@@ -569,12 +574,15 @@ def fore_back(path_dict):
 
 
 def sta_ratios(path_dict):
-    img_list = os.listdir(path_dict['data_path'])
-    num_imgs = len(img_list)
+    mask_list = os.listdir(path_dict['data_path'])
+    num_imgs = len(mask_list)
+    for mask_file in mask_list:
+        if mask_file[-3:] != 'npy':
+            mask_list.remove(mask_file)
     bar = Bar('Saving ratios:', max=num_imgs)
     make_sure_path_exists(path_dict['save_path'])
 
-    for i, mask_file in enumerate(img_list):
+    for i, mask_file in enumerate(mask_list):
         mask = np.load(os.path.join(path_dict['data_path'], mask_file))
         ratios = np.zeros([NUM_CLASSES, 2])
         for category in range(NUM_CLASSES):
@@ -676,13 +684,13 @@ if __name__ == '__main__':
     transpose_paths['data_path'] = os.path.join(paths_dict['val_split_256'], 'label')
     transpose_paths['save_path'] = os.path.join(paths_dict['val_split_256'], 'mask')
 
-    # transpose_paths['data_path'] = os.path.join(paths_dict['test_path'], 'label')
-    # transpose_paths['save_path'] = os.path.join(paths_dict['test_path'], 'mask')
+    transpose_paths['data_path'] = os.path.join(paths_dict['test_path'], 'label')
+    transpose_paths['save_path'] = os.path.join(paths_dict['test_path'], 'mask')
 
     # transpose_paths['data_path'] = os.path.join(paths_dict['data_split_192'], 'label')
     # transpose_paths['save_path'] = os.path.join(paths_dict['data_split_192'], 'mask')
 
-    # save_label_map(transpose_paths)
+    save_label_map(transpose_paths)
 
     ratios_paths = {}
     ratios_paths['data_path'] = os.path.join(paths_dict['train_split_256'], 'mask')
@@ -691,12 +699,12 @@ if __name__ == '__main__':
     # ratios_paths['data_path'] = os.path.join(paths_dict['val_split_256'], 'mask')
     # ratios_paths['save_path'] = os.path.join(paths_dict['val_split_256'], 'ratios')
 
-    # ratios_paths['data_path'] = os.path.join(paths_dict['test_path'], 'mask')
-    # ratios_paths['save_path'] = os.path.join(paths_dict['test_path'], 'ratios')
+    ratios_paths['data_path'] = os.path.join(paths_dict['test_path'], 'mask')
+    ratios_paths['save_path'] = os.path.join(paths_dict['test_path'], 'ratios')
 
     # ratios_paths['data_path'] = os.path.join(paths_dict['train_split_192'], 'mask')
     # ratios_paths['save_path'] = os.path.join(paths_dict['train_split_192'], 'ratios')
-    # sta_ratios(ratios_paths)
+    sta_ratios(ratios_paths)
 
     # division_paths = {}
     # division_paths['source_path'] = paths_dict['data_split_192']
@@ -705,8 +713,8 @@ if __name__ == '__main__':
 
     # train_valid(division_paths)
 
-    data_path = os.path.join(paths_dict['train_split_256'], 'img')
-    print(mean_std(data_path))
+    # data_path = os.path.join(paths_dict['train_split_256'], 'img')
+    # print(mean_std(data_path))
 
     # dis_path = os.path.join(paths_dict['val_split_256'], 'mask')
     # distributing(dis_path)

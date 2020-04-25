@@ -48,28 +48,36 @@ class Rssrai(Dataset):
             self._label_dir = os.path.join(self._base_dir, 'test', 'mask')
             self._ratios_dir = os.path.join(self._base_dir, 'test', 'ratios')
             self._data_list = os.listdir(self._image_dir)
+            for data in self._data_list:
+                if data[-3:] != 'npy':
+                    self._data_list.remove(data)
             self.len = len(self._data_list)
 
     def __len__(self):
         return self.len
 
     def __getitem__(self, idx):
-        return self.load_numpy(idx, self._mode)
-        # if self._mode != "test":
-        #     return self.load_numpy(idx, self._mode)
-        # else:
-        #     return self.load_test_numpy(idx)
+        # return self.load_numpy(idx, self._mode)
+        if self._mode != "test":
+            return self.load_numpy(idx, self._mode)
+        else:
+            return self.load_test_numpy(idx)
 
     def load_test_numpy(self, idx):
-        img = np.load(os.path.join(self._image_dir, self._data_list[idx]))
-        img = self._test_enhance(img)
-        img = img.transpose((2, 0, 1))
-        return img, self._data_list[idx]
+        image = np.load(os.path.join(self._image_dir, self._data_list[idx]))
+        mask = np.load(os.path.join(self._label_dir, self._data_list[idx]))
+        print(mask.shape)
+        sample = {'image': image, 'label': mask}
+        ratios = np.load(os.path.join(self._ratios_dir, self._data_list[idx]))
+        sample = self._test_enhance(sample)
+        sample['image'] = sample['image'].transpose((2, 0, 1))
+        sample['ratios'] = np.array(ratios[:, 0])
+        sample['file'] = self._data_list[idx]
+        return sample
 
     def load_numpy(self, idx, mode):
         image = np.load(os.path.join(self._image_dir, self._data_list[idx]))
         mask = np.load(os.path.join(self._label_dir, self._data_list[idx]))
-
         ratios = np.load(os.path.join(self._ratios_dir, self._data_list[idx]))
         sample = {'image': image, 'label': mask}
         if mode == 'train':
@@ -114,8 +122,9 @@ class Rssrai(Dataset):
         sample['image'] = sample['image'].transpose((1, 2, 0))
         return compose(**sample)
 
-    def _test_enhance(self, image):
-        image = image.transpose(1, 2, 0)
+    def _test_enhance(self, sample):
+        # image = image.transpose(1, 2, 0)
         norm = A.Compose([
-            A.Normalize(mean=self.mean, std=self.std, p=1)])
-        return norm(image=image)['image']
+            A.Normalize(mean=self.mean, std=self.std, p=1)],
+            additional_targets={'image': 'image', 'label': 'mask'})
+        return norm(**sample)
