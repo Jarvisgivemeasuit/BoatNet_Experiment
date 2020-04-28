@@ -49,7 +49,7 @@ class Trainer:
                              self.args.inplanes, self.num_classes, 
                              self.args.use_threshold, self.args.use_gcn).cuda()
 
-        self.optimizer = torch.optim.SGD(self.net.parameters(), lr=self.args.lr, momentum=0.9, weight_decay=5e-4)
+        self.optimizer = torch.optim.SGD(self.net.parameters(), lr=self.args.lr, momentum=0.9, weight_decay=1e-4)
         if self.args.apex:
             self.net, self.optimizer = amp.initialize(self.net, self.optimizer, opt_level='O1')
 
@@ -57,9 +57,8 @@ class Trainer:
 
         self.criterion1 = nn.CrossEntropyLoss().cuda()
         self.criterion2 = SoftCrossEntropyLoss(times=1).cuda()
-        # self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, [30, 50, 75, 90], 0.3)
         # self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, mode='min', factor=0.3, patience=3)
-        self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(self.optimizer, T_max=100, eta_min=5e-6)
+        self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(self.optimizer, T_max=self.args.epochs, eta_min=7e-6)
 
         self.Metric = namedtuple('Metric', 'pixacc miou kappa')
 
@@ -70,10 +69,6 @@ class Trainer:
         self.val_metric = self.Metric(pixacc=metrics.PixelAccuracy(),
                                         miou=metrics.MeanIoU(self.num_classes),
                                         kappa=metrics.Kappa(self.num_classes))
-
-        # self.writer_acc = SummaryWriter('dt_gcn/acc')
-        # self.writer_miou = SummaryWriter('dt_gcn/miou')
-        # self.writer_kappa = SummaryWriter('dt_gcn/kappa')
 
         self.writer_acc = SummaryWriter(f'{self.args.board_dir}/acc')
         self.writer_miou = SummaryWriter(f'{self.args.board_dir}/miou')
@@ -103,7 +98,7 @@ class Trainer:
 
         self.net.train()
         self.net.freeze_backbone()
-        if epoch == 6:
+        if epoch == 4:
             self.net.train_backbone()
 
         for idx, sample in enumerate(self.train_loader):
@@ -234,7 +229,7 @@ class Trainer:
             batch_time.update(time.time() - starttime)
             starttime = time.time()
 
-            bar.suffix = '({batch}/{size}) Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss: {loss:.4f},loss1: {loss1:.4f},loss2: {loss2:.4f}| Acc: {Acc:.4f} | mIoU: {mIoU: .4f},maxIoU:{maxIoU:.4f},idx:{index1},minIoU:{minIoU:.4f},idx:{index2} | kappa: {kappa: .4f}'.format(
+            bar.suffix = '({batch}/{size}) Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss: {loss:.4f},loss1: {loss1:.4f},loss2: {loss2:.4f}| Acc: {Acc:.4f} | mIoU: {mIoU:.4f},maxIoU:{maxIoU:.4f},idx:{index1},minIoU:{minIoU:.4f},idx:{index2} | kappa: {kappa: .4f}'.format(
                 batch=idx + 1,
                 size=len(self.val_loader),
                 bt=batch_time.avg,
@@ -276,7 +271,9 @@ class Trainer:
         self.writer_acc.add_scalar('val/val_loss', losses.avg, epoch)
 
         if epoch == self.args.epochs:
-            self.writer.close()
+            self.writer_acc.close()
+            self.writer_miou.close()
+            self.writer_kappa.close()
         return self.val_metric.pixacc.get()
 
 

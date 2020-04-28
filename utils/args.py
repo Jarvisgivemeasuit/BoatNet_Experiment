@@ -3,8 +3,8 @@ import os
 class Args:
 
     def __init__(self):
-        self.tr_batch_size = 48
-        self.vd_batch_size = 48
+        self.tr_batch_size = 20
+        self.vd_batch_size = 20
         self.num_workers = 8
         self.inplanes = 4
 
@@ -13,8 +13,8 @@ class Args:
         self.model_name = 'unet'
         self.backbone = 'resnet50'
 
-        self.epochs = 100
-        self.lr = 0.1
+        self.epochs = 120
+        self.lr = 0.07
         self.no_val = False
 
         self.gpu_ids = [0]
@@ -23,6 +23,6 @@ class Args:
         self.cuda = torch.cuda.is_available()
         self.apex = True
 
-        self.vis_image_dir = '/home/mist/rssrai/vis_image/'
+        self.vis_image_dir = '/home/grey/datasets/rssrai/vis_image/'
         self.board_dir = 'unet_base'
         # self.vis_image_dir = '/home/arron/Documents/grey/paper/vis_image/'
