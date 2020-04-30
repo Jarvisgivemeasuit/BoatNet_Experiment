@@ -60,9 +60,9 @@ class Trainer:
         #                                                                         1.2,2,0.8,1.2,
         #                                                                         1.1,0.5,1.1,2,
         #                                                                         1.2,0.8,1.2,0.8])).float()).cuda()
-        self.criterion1 = nn.CrossEntropyLoss(weight=torch.from_numpy(np.array([1,1,0.7,2,
+        self.criterion1 = nn.CrossEntropyLoss(weight=torch.from_numpy(np.array([1,1,0.7,2.5,
                                                                                 1.2,5,0.8,2,
-                                                                                1.1,0.4,1.1,3,
+                                                                                1.3,0.4,1.1,3,
                                                                                 1.2,0.5,1.2,0.8])).float()).cuda()
         self.criterion2 = SoftCrossEntropyLoss(times=1).cuda()
         self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, [25, 40, 65, 80], 0.3)

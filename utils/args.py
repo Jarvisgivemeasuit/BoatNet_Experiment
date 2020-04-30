@@ -3,8 +3,8 @@ import os
 class Args:
 
     def __init__(self):
-        self.tr_batch_size = 40
-        self.vd_batch_size = 40
+        self.tr_batch_size = 48
+        self.vd_batch_size = 48
         self.num_workers = 8
         self.inplanes = 4
 
@@ -14,7 +14,7 @@ class Args:
         self.backbone = 'resnet50'
 
         self.epochs = 90
-        self.lr = 0.03
+        self.lr = 0.04
         self.no_val = False
 
         self.gpu_ids = [0]
