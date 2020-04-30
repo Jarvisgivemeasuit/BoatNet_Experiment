@@ -36,11 +36,11 @@ class Tester:
         self.criterion1 = torch.nn.CrossEntropyLoss().cuda()
         self.criterion2 = SoftCrossEntropyLoss().cuda()
 
-        self.save_path = make_sure_path_exists(os.path.join(save_path, "tmp"))
+        # self.save_path = make_sure_path_exists(os.path.join(save_path, "tmp"))
         self.final_save_path = make_sure_path_exists(os.path.join(save_path, "unet-resnet50"))
         self.Metric = namedtuple('Metric', 'pixacc miou kappa')
-        self.mean = (0.52179472, 0.36677649, 0.39002522, 0.35391396)
-        self.std = (0.25901934, 0.25514357, 0.23966101, 0.23451189)
+        self.mean = (0.49283749, 0.337761, 0.3473801 , 0.33598172)
+        self.std = (0.25492469, 0.22505004, 0.20915616, 0.21764152)
         self.val_metric = self.Metric(pixacc=metrics.PixelAccuracy(),
                                 miou=metrics.MeanIoU(self.num_classes),
                                 kappa=metrics.Kappa(self.num_classes))
@@ -167,7 +167,7 @@ class Tester:
             self.val_metric.miou.update(output, tar)
             self.val_metric.kappa.update(output, tar)
 
-            # self.save_image(output, img_file)
+            self.save_image(output, img_file)
 
             batch_time.update(time.time() - starttime)
             starttime = time.time()
@@ -200,7 +200,7 @@ class Tester:
         for i in range(output.shape[0]):
             output_rgb_tmp = decode_segmap(output[i], self.num_classes).astype(np.uint8)
             output_rgb_tmp =Image.fromarray(output_rgb_tmp)
-            output_rgb_tmp.save(os.path.join(self.save_path, img_file[i].replace('npy', 'tif')))
+            output_rgb_tmp.save(os.path.join(self.final_save_path, img_file[i].replace('npy', 'tif')))
 
 
 # def test():
@@ -212,10 +212,10 @@ class Tester:
 #     tester.testing()
 
 def test():
-    save_result_path = '/home/mist/results/'
-    param_path = '/home/mist/rssrai_model_saving/unet-resnet50_False_False.pth'
+    save_result_path = '/home/grey/datasets/rssrai/results/'
+    param_path = '/home/grey/Documents/rssrai_model_saving/unet-resnet50_False_False.pth'
     torch.load(param_path)
-    tester = Tester(Args, param_path, save_result_path, 48, use_threshold=False)
+    tester = Tester(Args, param_path, save_result_path, 1, use_threshold=False)
 
     print("==> Start testing")
     tester.testing()

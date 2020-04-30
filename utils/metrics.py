@@ -54,10 +54,10 @@ class MeanIoU:
             self.num_intersection[cur_cls] += intersection.item()
             self.num_union[cur_cls] += union.item()
 
-    def get(self, ignore_background=False):
+    def get(self, ignore_background=True):
         if ignore_background:
-            return (self.num_intersection[1:] /
-                    (self.num_union[1:] + self.eps)).mean()
+            iou_list = (self.num_intersection[:-1] / (self.num_union[:-1] + self.eps))
+            return iou_list.mean(), iou_list.max(), np.where(iou_list == iou_list.max()), iou_list.min(), np.where(iou_list == iou_list.min())
         else:
             iou_list = (self.num_intersection / (self.num_union + self.eps))
             return iou_list.mean(), iou_list.max(), np.where(iou_list == iou_list.max()), iou_list.min(), np.where(iou_list == iou_list.min())

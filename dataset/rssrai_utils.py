@@ -61,8 +61,11 @@ mask_colormap = np.array([[0, 200, 0],
                        [0, 200, 250],
                        [0, 0, 0]])
 
-mean = (0.51372973, 0.36565839, 0.3849661 , 0.34994407)
-std = (0.25732201, 0.25336172, 0.24005725, 0.23685243)
+# mean = (0.51362685, 0.36748677, 0.38558662, 0.35080298)
+# std = (0.25827187, 0.25472762, 0.24076013, 0.23694653)
+
+mean = (0.52599181, 0.37223402, 0.39633026, 0.36051684)
+std = (0.52599181, 0.37223402, 0.39633026, 0.36051684)
 NUM_CLASSES = 16
 
 
@@ -247,13 +250,15 @@ class RandomImageSpliter:
         make_sure_path_exists(os.path.join(self.val_path, 'label'))
         i = 0
         while True:
-            img, label, information = self.random_crop(mode='val')
-
-            if information[0] not in self.valid_range_list:
-                self.valid_range_list[information[0]] = []
-                self.valid_range_list[information[0]].append(information[1:])
+            if i < num_samples * 0.8:
+                img, label, information = self.random_crop(mode='val', condition=True)
             else:
-                self.valid_range_list[information[0]].append(information[1:])
+                img, label, information = self.random_crop(condition=True)
+            # if information[0] not in self.valid_range_list:
+            #     self.valid_range_list[information[0]] = []
+            #     self.valid_range_list[information[0]].append(information[1:])
+            # else:
+            #     self.valid_range_list[information[0]].append(information[1:])
 
             np.save(os.path.join(self.val_path, 'img', f'{i}'), img)
             np.save(os.path.join(self.val_path, 'label', f'{i}'), label)
@@ -264,35 +269,35 @@ class RandomImageSpliter:
             if i == num_samples:
                 break
         bar.finish()
-        np.save(os.path.join(self.val_path, 'informations'), self.valid_range_list)
+        # np.save(os.path.join(self.val_path, 'informations'), self.valid_range_list)
 
     def split_tr_image(self, num_samples):
-        self.valid_range_list = np.load(os.path.join(self.val_path, 'informations.npy'), allow_pickle=True).item()
+        # self.valid_range_list = np.load(os.path.join(self.val_path, 'informations.npy'), allow_pickle=True).item()
         i = 1
         bar = Bar('spliting tr image:', max=num_samples)
         make_sure_path_exists(os.path.join(self.train_path, 'img'))
         make_sure_path_exists(os.path.join(self.train_path, 'label'))
 
         while True:
-            if i < num_samples * 0.6:
+            if i < num_samples * 0.8:
                 img, label, information = self.random_crop(mode='val', condition=True)
 
-                ranges = np.array(self.valid_range_list[information[0]]).copy()
-                ranges[:, 0][ranges[:, 0] < information[1]] = information[1]
-                ranges[:, 1][ranges[:, 1] < information[2]] = information[2]
-                xmin = ranges[:, 0]
-                ymin = ranges[:, 1]
+                # ranges = np.array(self.valid_range_list[information[0]]).copy()
+                # ranges[:, 0][ranges[:, 0] < information[1]] = information[1]
+                # ranges[:, 1][ranges[:, 1] < information[2]] = information[2]
+                # xmin = ranges[:, 0]
+                # ymin = ranges[:, 1]
 
-                ranges = np.array(self.valid_range_list[information[0]]).copy()
-                ranges[:, 0] = ranges[:, 0] + self.crop_size[0]
-                ranges[:, 1] = ranges[:, 1] + self.crop_size[1]
-                ranges[:, 0][ranges[:, 0] > information[1] + self.crop_size[0]] = information[1] + self.crop_size[0]
-                ranges[:, 1][ranges[:, 1] > information[2] + self.crop_size[1]] = information[2] + self.crop_size[1]
-                xmax = ranges[:, 0]
-                ymax = ranges[:, 1]
+                # ranges = np.array(self.valid_range_list[information[0]]).copy()
+                # ranges[:, 0] = ranges[:, 0] + self.crop_size[0]
+                # ranges[:, 1] = ranges[:, 1] + self.crop_size[1]
+                # ranges[:, 0][ranges[:, 0] > information[1] + self.crop_size[0]] = information[1] + self.crop_size[0]
+                # ranges[:, 1][ranges[:, 1] > information[2] + self.crop_size[1]] = information[2] + self.crop_size[1]
+                # xmax = ranges[:, 0]
+                # ymax = ranges[:, 1]
 
-                if (xmax - xmin > 0).sum() > 0 and (ymax - ymin > 0).sum() > 0:
-                    continue
+                # if (xmax - xmin > 0).sum() > 0 and (ymax - ymin > 0).sum() > 0:
+                #     continue
             else:
                 img, label, information = self.random_crop(condition=True)
             
@@ -300,7 +305,7 @@ class RandomImageSpliter:
                 continue
 
             if information[0] not in self.ori_img_list:
-                self.ori_img_list[information[0]] = np.zeros(label.shape[:2])
+                self.ori_img_list[information[0]] = np.zeros(information[3].shape[:2])
                 self.ori_img_list[information[0]][information[1]:information[1] + self.crop_size[0], information[2]:information[2] + self.crop_size[1]] += 1
             else:
                 self.ori_img_list[information[0]][information[1]:information[1]  + self.crop_size[0], information[2]:information[2] + self.crop_size[1]] += 1
@@ -360,7 +365,7 @@ class RandomImageSpliter:
 
         crop_image = img[topY:topY + self.crop_size[0], leftX:leftX + self.crop_size[1], :].transpose((2, 0, 1))
         crop_label = label[topY:topY + self.crop_size[0], leftX:leftX + self.crop_size[1], :].transpose((2, 0, 1))
-        return crop_image, crop_label, [img_file, topY, leftX]
+        return crop_image, crop_label, [img_file, topY, leftX, label.shape]
 
 
 class TestImageSpliter:
@@ -657,22 +662,22 @@ if __name__ == '__main__':
     # spliter_paths['save_path'] = paths_dict['data_split_192']
 
     spliter_paths['data_path'] = paths_dict['ori_path']
-    spliter_paths['train_path'] = paths_dict['train_split_256']
-    spliter_paths['val_path'] = paths_dict['val_split_256']
+    spliter_paths['train_path'] = paths_dict['train_split_192']
+    spliter_paths['val_path'] = paths_dict['val_split_192']
     spliter_paths['img_format'] = '.tif'
 
-    spliter = RandomImageSpliter(spliter_paths)
-    # spliter.split_vd_image(400)
-    # spliter.split_tr_image(15000)
+    # spliter = RandomImageSpliter(spliter_paths)
+    # spliter.split_vd_image(500)
+    # spliter.split_tr_image(25000)
     # spliter = ImageSpliter(spliter_paths, crop_size=(192, 192))
     # spliter.split_image()
 
     transpose_paths = {}
-    transpose_paths['data_path'] = os.path.join(paths_dict['train_split_256'], 'label')
-    transpose_paths['save_path'] = os.path.join(paths_dict['train_split_256'], 'mask')
+    # transpose_paths['data_path'] = os.path.join(paths_dict['train_split_192'], 'label')
+    # transpose_paths['save_path'] = os.path.join(paths_dict['train_split_192'], 'mask')
 
-    # transpose_paths['data_path'] = os.path.join(paths_dict['val_split_256'], 'label')
-    # transpose_paths['save_path'] = os.path.join(paths_dict['val_split_256'], 'mask')
+    transpose_paths['data_path'] = os.path.join(paths_dict['val_split_256'], 'label')
+    transpose_paths['save_path'] = os.path.join(paths_dict['val_split_256'], 'mask')
 
     # transpose_paths['data_path'] = os.path.join(paths_dict['test_path'], 'label')
     # transpose_paths['save_path'] = os.path.join(paths_dict['test_path'], 'mask')
@@ -680,14 +685,14 @@ if __name__ == '__main__':
     # transpose_paths['data_path'] = os.path.join(paths_dict['data_split_192'], 'label')
     # transpose_paths['save_path'] = os.path.join(paths_dict['data_split_192'], 'mask')
 
-    # save_label_map(transpose_paths)
+    save_label_map(transpose_paths)
 
     ratios_paths = {}
-    ratios_paths['data_path'] = os.path.join(paths_dict['train_split_256'], 'mask')
-    ratios_paths['save_path'] = os.path.join(paths_dict['train_split_256'], 'ratios')
+    # ratios_paths['data_path'] = os.path.join(paths_dict['train_split_192'], 'mask')
+    # ratios_paths['save_path'] = os.path.join(paths_dict['train_split_192'], 'ratios')
 
-    # ratios_paths['data_path'] = os.path.join(paths_dict['val_split_256'], 'mask')
-    # ratios_paths['save_path'] = os.path.join(paths_dict['val_split_256'], 'ratios')
+    ratios_paths['data_path'] = os.path.join(paths_dict['val_split_192'], 'mask')
+    ratios_paths['save_path'] = os.path.join(paths_dict['val_split_192'], 'ratios')
 
     # ratios_paths['data_path'] = os.path.join(paths_dict['test_path'], 'mask')
     # ratios_paths['save_path'] = os.path.join(paths_dict['test_path'], 'ratios')
@@ -703,7 +708,7 @@ if __name__ == '__main__':
 
     # train_valid(division_paths)
 
-    data_path = os.path.join(paths_dict['train_split_256'], 'img')
+    data_path = os.path.join(paths_dict['val_split_192'], 'img')
     print(mean_std(data_path))
 
     # dis_path = os.path.join(paths_dict['val_split_256'], 'mask')

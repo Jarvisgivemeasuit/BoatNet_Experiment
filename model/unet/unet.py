@@ -98,10 +98,10 @@ class Pred_Fore_Rate(nn.Module):
         self.conv = nn.Sequential(
             nn.Conv2d(16, 16, 3, stride=2, padding=1),
             nn.BatchNorm2d(16),
-            nn.ReLU(inplace=True),
+            nn.LeakyReLU(inplace=True),
             nn.Conv2d(16, 16, 3, stride=2, padding=1),
             nn.BatchNorm2d(16),
-            nn.ReLU(inplace=True)
+            nn.LeakyReLU(inplace=True)
         )
         self.pool = nn.AdaptiveAvgPool2d(1)
 
@@ -121,10 +121,10 @@ class Double_conv(nn.Module):
         self.conv = nn.Sequential(
             nn.Conv2d(inplanes, planes, 3, padding=1),
             nn.BatchNorm2d(planes),
-            nn.ReLU(inplace=True),
+            nn.LeakyReLU(inplace=True),
             nn.Conv2d(planes, planes, 3, padding=1),
             nn.BatchNorm2d(planes),
-            nn.ReLU(inplace=True))
+            nn.LeakyReLU(inplace=True))
 
     def forward(self, x):
         x = self.conv(x)
@@ -187,7 +187,10 @@ class Up_Gcn(nn.Module):
 class ChDecrease(nn.Module):
     def __init__(self, inplanes, times):
         super().__init__()
-        self.conv1x1 = nn.Conv2d(inplanes, inplanes // times, kernel_size=1)
+        self.conv1x1 = nn.Sequential(
+            nn.Conv2d(inplanes, inplanes // times, kernel_size=1),
+            nn.BatchNorm2d(inplanes // times),
+            nn.LeakyReLU(inplace=True))
 
     def forward(self, x):
         x = self.conv1x1(x)
@@ -284,7 +287,13 @@ class UNet(nn.Module):
         return (output, ratios) if self.use_threshold else output
 
     def freeze_backbone(self):
-        for param in self.down.parameters():
+        for param in self.down.layer1.parameters():
+            param.requires_grad = False
+        for param in self.down.layer2.parameters():
+            param.requires_grad = False
+        for param in self.down.layer3.parameters():
+            param.requires_grad = False
+        for param in self.down.layer4.parameters():
             param.requires_grad = False
 
     def train_backbone(self):

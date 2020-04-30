@@ -37,7 +37,7 @@ class Trainer:
         self.best_pred = 0
         self.best_miou = 0
 
-        train_set, val_set, self.num_classes = make_dataset()
+        train_set, val_set, self.num_classes = make_dataset('rssrai2')
         self.mean = train_set.mean
         self.std = train_set.std
         self.train_loader = DataLoader(train_set, batch_size=self.args.tr_batch_size,
@@ -49,16 +49,24 @@ class Trainer:
                              self.args.inplanes, self.num_classes, 
                              self.args.use_threshold, self.args.use_gcn).cuda()
 
-        self.optimizer = torch.optim.SGD(self.net.parameters(), lr=self.args.lr, momentum=0.9, weight_decay=1e-4)
+        self.optimizer = torch.optim.SGD(self.net.parameters(), lr=self.args.lr, momentum=0.9, weight_decay=5e-4)
         if self.args.apex:
             self.net, self.optimizer = amp.initialize(self.net, self.optimizer, opt_level='O1')
 
         # self.net = nn.DataParallel(self.net, self.args.gpu_ids)
 
-        self.criterion1 = nn.CrossEntropyLoss().cuda()
+        # self.criterion1 = nn.CrossEntropyLoss().cuda()
+        # self.criterion1 = nn.CrossEntropyLoss(weight=torch.from_numpy(np.array([1,0.5,0.8,1.1,
+        #                                                                         1.2,2,0.8,1.2,
+        #                                                                         1.1,0.5,1.1,2,
+        #                                                                         1.2,0.8,1.2,0.8])).float()).cuda()
+        self.criterion1 = nn.CrossEntropyLoss(weight=torch.from_numpy(np.array([1,0.5,0.5,1.1,
+                                                                                1.2,3,0.8,1.3,
+                                                                                1.1,0.4,1.1,2.5,
+                                                                                1.2,0.8,1.2,0.8])).float()).cuda()
         self.criterion2 = SoftCrossEntropyLoss(times=1).cuda()
         # self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, mode='min', factor=0.3, patience=3)
-        self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(self.optimizer, T_max=self.args.epochs, eta_min=7e-6)
+        self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(self.optimizer, T_max=self.args.epochs, eta_min=5e-5)
 
         self.Metric = namedtuple('Metric', 'pixacc miou kappa')
 
@@ -97,9 +105,9 @@ class Trainer:
         bar = Bar('Training', max=num_train)
 
         self.net.train()
-        self.net.freeze_backbone()
-        if epoch == 4:
-            self.net.train_backbone()
+        # self.net.freeze_backbone()
+        # if epoch == 4:
+        #     self.net.train_backbone()
 
         for idx, sample in enumerate(self.train_loader):
             img, tar, ratios = sample['image'], sample['label'], sample['ratios']
@@ -229,7 +237,7 @@ class Trainer:
             batch_time.update(time.time() - starttime)
             starttime = time.time()
 
-            bar.suffix = '({batch}/{size}) Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss: {loss:.4f},loss1: {loss1:.4f},loss2: {loss2:.4f}| Acc: {Acc:.4f} | mIoU: {mIoU:.4f},maxIoU:{maxIoU:.4f},idx:{index1},minIoU:{minIoU:.4f},idx:{index2} | kappa: {kappa: .4f}'.format(
+            bar.suffix = '({batch}/{size}) Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss: {loss:.4f},loss1: {loss1:.4f},loss2: {loss2:.4f} | Acc: {Acc:.4f} | mIoU: {mIoU:.4f},maxIoU:{maxIoU:.4f},idx:{index1},minIoU:{minIoU:.4f},idx:{index2} | kappa: {kappa: .4f}'.format(
                 batch=idx + 1,
                 size=len(self.val_loader),
                 bt=batch_time.avg,

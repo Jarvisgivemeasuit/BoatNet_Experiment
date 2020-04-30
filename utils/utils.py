@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from PIL import Image
 sys.path.append('../')
 
-from dataset import rssrai
+from dataset import rssrai, rssrai2
 
 import torch
 from torch import nn
@@ -84,9 +84,13 @@ def get_labels(label_number):
     return label_colors[label_number]
 
 
-def make_dataset():
-    train_set = rssrai.Rssrai(mode='train')
-    val_set = rssrai.Rssrai(mode='val')
+def make_dataset(dataset):
+    if dataset == "rssrai":
+        train_set = rssrai.Rssrai(mode='train')
+        val_set = rssrai.Rssrai(mode='val')
+    else:
+        train_set = rssrai2.Rssrai(mode='train')
+        val_set = rssrai2.Rssrai(mode='val')
     return train_set, val_set, train_set.NUM_CLASSES
 
 
