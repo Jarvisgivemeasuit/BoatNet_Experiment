@@ -27,16 +27,16 @@ class Rssrai(Dataset):
         self.std = std
 
         if self._mode == 'train':
-            self._image_dir = os.path.join(self._base_dir, 'train_split_256', 'img')
-            self._label_dir = os.path.join(self._base_dir, 'train_split_256', 'mask')
-            self._ratios_dir = os.path.join(self._base_dir, 'train_split_256', 'ratios')
+            self._image_dir = os.path.join(self._base_dir, 'train_split_192', 'img')
+            self._label_dir = os.path.join(self._base_dir, 'train_split_192', 'mask')
+            self._ratios_dir = os.path.join(self._base_dir, 'train_split_192', 'ratios')
             self._data_list = os.listdir(self._image_dir)
             self.len = len(self._data_list)
 
         if self._mode == 'val':
-            self._image_dir = os.path.join(self._base_dir, 'val_split_256', 'img')
-            self._label_dir = os.path.join(self._base_dir, 'val_split_256', 'mask')
-            self._ratios_dir = os.path.join(self._base_dir, 'val_split_256', 'ratios')
+            self._image_dir = os.path.join(self._base_dir, 'val_split_192', 'img')
+            self._label_dir = os.path.join(self._base_dir, 'val_split_192', 'mask')
+            self._ratios_dir = os.path.join(self._base_dir, 'val_split_192', 'ratios')
             self._data_list = os.listdir(self._image_dir)
             self.len = len(self._data_list)
 
@@ -99,7 +99,7 @@ class Rssrai(Dataset):
     def _valid_enhance(self, sample):
         compose = A.Compose([
             # A.Normalize(mean=(0.54010072, 0.40851444, 0.4173501 , 0.38801662), std=(0.54010072, 0.40851444, 0.4173501, 0.38801662), p=1)
-            A.Normalize(mean=(0.52599181, 0.37223402, 0.39633026, 0.36051684), std=(0.24623929, 0.24797055, 0.23415287, 0.23056658))
+            A.Normalize(mean=(0.54299763, 0.37632373, 0.39589563, 0.36152624), std=(0.25004608, 0.24948001, 0.23498456, 0.23068938))
         ], additional_targets={'image': 'image', 'label': 'mask'})
         sample['image'] = sample['image'].transpose((1, 2, 0))
         return compose(**sample)    

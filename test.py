@@ -195,6 +195,8 @@ class Tester:
         print(f'numImages: {num_val * self.batch_size}]')
         print(f'Test Loss: {losses.avg:.4f}')
 
+        print(self.val_metric.miou.get_all())
+
     def save_image(self, output, img_file):
         output = torch.argmax(output, dim=1).cpu().numpy()
         for i in range(output.shape[0]):
@@ -212,8 +214,8 @@ class Tester:
 #     tester.testing()
 
 def test():
-    save_result_path = '/home/grey/datasets/rssrai/results/'
-    param_path = '/home/grey/Documents/rssrai_model_saving/unet-resnet50_False_False.pth'
+    save_result_path = '/home/mist/rssrai/results/'
+    param_path = '/home/mist/rssrai_model_saving/unet-resnet50_False_False.pth'
     torch.load(param_path)
     tester = Tester(Args, param_path, save_result_path, 1, use_threshold=False)
 

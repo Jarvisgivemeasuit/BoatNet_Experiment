@@ -65,6 +65,9 @@ class MeanIoU:
     def reset(self):
         self.num_intersection = np.zeros(self.num_classes)
         self.num_union = np.zeros(self.num_classes)
+    
+    def get_all(self):
+        return (self.num_intersection[:-1] / (self.num_union[:-1] + self.eps))
 
 
 class Kappa:

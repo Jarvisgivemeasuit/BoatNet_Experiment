@@ -37,7 +37,7 @@ class Trainer:
         self.best_pred = 0
         self.best_miou = 0
 
-        train_set, val_set, self.num_classes = make_dataset('rssrai2')
+        train_set, val_set, self.num_classes = make_dataset('rssrai')
         self.mean = train_set.mean
         self.std = train_set.std
         self.train_loader = DataLoader(train_set, batch_size=self.args.tr_batch_size,
@@ -60,13 +60,13 @@ class Trainer:
         #                                                                         1.2,2,0.8,1.2,
         #                                                                         1.1,0.5,1.1,2,
         #                                                                         1.2,0.8,1.2,0.8])).float()).cuda()
-        self.criterion1 = nn.CrossEntropyLoss(weight=torch.from_numpy(np.array([1,0.5,0.5,1.1,
-                                                                                1.2,3,0.8,1.3,
-                                                                                1.1,0.4,1.1,2.5,
-                                                                                1.2,0.8,1.2,0.8])).float()).cuda()
+        self.criterion1 = nn.CrossEntropyLoss(weight=torch.from_numpy(np.array([1,1,0.7,2,
+                                                                                1.2,5,0.8,2,
+                                                                                1.1,0.4,1.1,3,
+                                                                                1.2,0.5,1.2,0.8])).float()).cuda()
         self.criterion2 = SoftCrossEntropyLoss(times=1).cuda()
-        # self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, mode='min', factor=0.3, patience=3)
-        self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(self.optimizer, T_max=self.args.epochs, eta_min=5e-5)
+        self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, [25, 40, 65, 80], 0.3)
+        # self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(self.optimizer, T_max=self.args.epochs, eta_min=5e-5)
 
         self.Metric = namedtuple('Metric', 'pixacc miou kappa')
 
@@ -293,8 +293,8 @@ class Trainer:
         image_np = image.cpu().numpy()
         image_np = np.transpose(image_np, axes=[0, 2, 3, 1])
         image_np *= self.std
-        image_np += self.mean
-        image_np *= 255.0
+        image_np += (0.54299763, 0.37632373, 0.39589563, 0.36152624)
+        image_np *= (0.25004608, 0.24948001, 0.23498456, 0.23068938)
         image_np = image_np.astype(np.uint8)
         image_np = image_np[:, :, :, 1:]
 
@@ -329,7 +329,7 @@ def train():
     print("==> Start training")
     print('Total Epoches:', trainer.epochs)
     print('Starting Epoch:', trainer.start_epoch)
-    for epoch in range(trainer.start_epoch, trainer.epochs):
+    for epoch in range(trainer.start_epoch, trainer.epochs + 1):
         trainer.training(epoch)
         if not args.no_val:
             new_pred = trainer.validation(epoch)
