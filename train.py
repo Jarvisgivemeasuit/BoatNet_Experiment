@@ -60,13 +60,13 @@ class Trainer:
         #                                                                         1.2,2,0.8,1.2,
         #                                                                         1.1,0.5,1.1,2,
         #                                                                         1.2,0.8,1.2,0.8])).float()).cuda()
-        self.criterion1 = nn.CrossEntropyLoss(weight=torch.from_numpy(np.array([1,1,0.7,2.5,
-                                                                                1.2,5,0.8,2,
-                                                                                1.3,0.4,1.1,3,
-                                                                                1.2,0.5,1.2,0.8])).float()).cuda()
+        self.criterion1 = nn.CrossEntropyLoss(weight=torch.from_numpy(np.array([1, 0.9, 0.7, 4,
+                                                                                1.2, 6, 0.8, 2,
+                                                                                2.5, 0.4, 1.1, 3,
+                                                                                1.2, 0.5, 1.2, 0.8])).float()).cuda()
         self.criterion2 = SoftCrossEntropyLoss(times=1).cuda()
-        self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, [25, 40, 65, 80], 0.3)
-        # self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(self.optimizer, T_max=self.args.epochs, eta_min=5e-5)
+        self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, [20, 40, 60, 80], 0.3)
+        # self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(self.optimizer, T_max=self.args.epochs * len(self.train_loader), eta_min=1e-7)
 
         self.Metric = namedtuple('Metric', 'pixacc miou kappa')
 
@@ -98,6 +98,7 @@ class Trainer:
         batch_time = AverageMeter()
         losses1 = AverageMeter()
         losses2 = AverageMeter()
+        losses3 = AverageMeter()
         losses = AverageMeter()
         starttime = time.time()
 
@@ -105,9 +106,9 @@ class Trainer:
         bar = Bar('Training', max=num_train)
 
         self.net.train()
-        # self.net.freeze_backbone()
-        # if epoch == 4:
-        #     self.net.train_backbone()
+        self.net.freeze_backbone()
+        if epoch == 3:
+            self.net.train_backbone()
 
         for idx, sample in enumerate(self.train_loader):
             img, tar, ratios = sample['image'], sample['label'], sample['ratios']
@@ -117,13 +118,15 @@ class Trainer:
 
             self.optimizer.zero_grad()
             if self.args.use_threshold:
-                [output, output_ratios] = self.net(img)
+                [output, output_, output_ratios] = self.net(img)
 
                 loss1 = self.criterion1(output, tar.long())
-                loss2 = self.criterion2(output_ratios, ratios.float())
-                loss = loss1 + loss2
+                loss2 = self.criterion1(output_, tar.long())
+                loss3 = self.criterion2(output_ratios, ratios.float())
+                loss = loss1 + loss2 + loss3
                 losses1.update(loss1)
                 losses2.update(loss2)
+                losses3.update(loss3)
                 losses.update(loss)
             else:
                 output = self.net(img)
@@ -147,6 +150,7 @@ class Trainer:
                 output = output_tmp * dynamic.float()
 
             self.optimizer.step()
+            # self.scheduler.step()
 
             self.train_metric.pixacc.update(output, tar)
             self.train_metric.miou.update(output, tar)
@@ -155,7 +159,7 @@ class Trainer:
             batch_time.update(time.time() - starttime)
             starttime = time.time()
 
-            bar.suffix = '({batch}/{size}) Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss:{loss:.4f},loss1:{loss1:.4f},loss2:{loss2:.4f} | Acc: {Acc:.4f} | mIoU:{mIoU:.4f},maxIoU:{maxIoU:.4f},idx:{index1},minIoU:{minIoU:.4f},idx:{index2} | kappa: {kappa:.4f}'.format(
+            bar.suffix = '({batch}/{size}) Batch:{bt:.3f}s | Total:{total:} | ETA:{eta:} | Loss:{loss:.4f},loss1:{loss1:.4f},loss2:{loss2:.4f},loss3:{loss3:.4f} | Acc:{Acc:.4f} | mIoU:{mIoU:.4f},maxIoU:{maxIoU:.4f},idx:{index1},minIoU:{minIoU:.4f},idx:{index2} | kappa: {kappa:.4f}'.format(
                 batch=idx + 1,
                 size=len(self.train_loader),
                 bt=batch_time.avg,
@@ -164,6 +168,7 @@ class Trainer:
                 loss=losses.avg,
                 loss1=losses1.avg,
                 loss2=losses2.avg,
+                loss3=losses3.avg,
                 mIoU=self.train_metric.miou.get()[0],
                 maxIoU=self.train_metric.miou.get()[1],
                 index1=self.train_metric.miou.get()[2][0],
@@ -181,6 +186,7 @@ class Trainer:
         self.writer_miou.add_scalar('train', self.train_metric.miou.get()[0], epoch)
         self.writer_kappa.add_scalar('train', self.train_metric.kappa.get(), epoch)
         self.writer_acc.add_scalar('train/train_loss', losses.avg, epoch)
+        self.writer_acc.add_scalar('train/train_lr', self.get_lr(), epoch)
 
     def validation(self, epoch):
 
@@ -191,6 +197,7 @@ class Trainer:
         batch_time = AverageMeter()
         losses1 = AverageMeter()
         losses2 = AverageMeter()
+        losses3 = AverageMeter()
         losses = AverageMeter()
         starttime = time.time()
 
@@ -206,13 +213,15 @@ class Trainer:
                 img, tar, ratios = img.cuda(), tar.cuda(), ratios.cuda()
             with torch.no_grad():
                 if self.args.use_threshold:
-                    [output, output_ratios] = self.net(img)
+                    [output, output_, output_ratios] = self.net(img)
 
                     loss1 = self.criterion1(output, tar.long())
-                    loss2 = self.criterion2(output_ratios, ratios.float())
-                    loss = loss1 + loss2
+                    loss2 = self.criterion1(output_, tar.long())
+                    loss3 = self.criterion2(output_ratios, ratios.float())
+                    loss = loss1 + loss2 + loss3
                     losses1.update(loss1)
                     losses2.update(loss2)
+                    losses3.update(loss3)
                     losses.update(loss)
 
                     output_tmp = F.softmax(output, dim=1)
@@ -231,13 +240,12 @@ class Trainer:
             self.val_metric.miou.update(output, tar)
             self.val_metric.kappa.update(output, tar)
 
-            if idx % 5 == 0:
-                self.visualize_batch_image(img, tar, output, epoch, idx)
+            self.visualize_batch_image(img, tar, output, epoch, idx)
 
             batch_time.update(time.time() - starttime)
             starttime = time.time()
 
-            bar.suffix = '({batch}/{size}) Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss: {loss:.4f},loss1: {loss1:.4f},loss2: {loss2:.4f} | Acc: {Acc:.4f} | mIoU: {mIoU:.4f},maxIoU:{maxIoU:.4f},idx:{index1},minIoU:{minIoU:.4f},idx:{index2} | kappa: {kappa: .4f}'.format(
+            bar.suffix = '({batch}/{size}) Batch:{bt:.3f}s | Total:{total:} | ETA:{eta:} | Loss:{loss:.4f},loss1:{loss1:.4f},loss2:{loss2:.4f},loss3:{loss3:.4f} | Acc:{Acc:.4f} | mIoU:{mIoU:.4f},maxIoU:{maxIoU:.4f},idx:{index1},minIoU:{minIoU:.4f},idx:{index2} | kappa: {kappa: .4f}'.format(
                 batch=idx + 1,
                 size=len(self.val_loader),
                 bt=batch_time.avg,
@@ -246,6 +254,7 @@ class Trainer:
                 loss=losses.avg,
                 loss1=losses1.avg,
                 loss2=losses2.avg,
+                loss3=losses3.avg,
                 mIoU=self.val_metric.miou.get()[0],
                 maxIoU=self.val_metric.miou.get()[1],
                 index1=self.val_metric.miou.get()[2][0],
@@ -293,8 +302,7 @@ class Trainer:
         image_np = image.cpu().numpy()
         image_np = np.transpose(image_np, axes=[0, 2, 3, 1])
         image_np *= self.std
-        image_np += (0.54299763, 0.37632373, 0.39589563, 0.36152624)
-        image_np *= (0.25004608, 0.24948001, 0.23498456, 0.23068938)
+        image_np += self.mean
         image_np = image_np.astype(np.uint8)
         image_np = image_np[:, :, :, 1:]
 
@@ -331,9 +339,10 @@ def train():
     print('Starting Epoch:', trainer.start_epoch)
     for epoch in range(trainer.start_epoch, trainer.epochs + 1):
         trainer.training(epoch)
+
         if not args.no_val:
             new_pred = trainer.validation(epoch)
-            trainer.scheduler.step(new_pred)
+            trainer.scheduler.step(epoch)
             # trainer.auto_reset_learning_rate()
 
 

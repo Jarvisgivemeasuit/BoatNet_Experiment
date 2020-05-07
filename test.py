@@ -39,8 +39,6 @@ class Tester:
         # self.save_path = make_sure_path_exists(os.path.join(save_path, "tmp"))
         self.final_save_path = make_sure_path_exists(os.path.join(save_path, "unet-resnet50"))
         self.Metric = namedtuple('Metric', 'pixacc miou kappa')
-        self.mean = (0.49283749, 0.337761, 0.3473801 , 0.33598172)
-        self.std = (0.25492469, 0.22505004, 0.20915616, 0.21764152)
         self.val_metric = self.Metric(pixacc=metrics.PixelAccuracy(),
                                 miou=metrics.MeanIoU(self.num_classes),
                                 kappa=metrics.Kappa(self.num_classes))
@@ -124,6 +122,7 @@ class Tester:
         batch_time = AverageMeter()
         losses1 = AverageMeter()
         losses2 = AverageMeter()
+        losses3 = AverageMeter()
         losses = AverageMeter()
         starttime = time.time()
 
@@ -142,13 +141,15 @@ class Tester:
                 img, tar, ratios = img.cuda(), tar.cuda(), ratios.cuda()
             with torch.no_grad():
                 if self.use_threshold:
-                    [output, output_ratios] = self.net(img)
+                    [output, output_, output_ratios] = self.net(img)
 
                     loss1 = self.criterion1(output, tar.long())
-                    loss2 = self.criterion2(output_ratios, ratios.float())
-                    loss = loss1 + loss2
+                    loss2 = self.criterion1(output_, tar.long())
+                    loss3 = self.criterion2(output_ratios, ratios.float())
+                    loss = loss1 + loss2 + loss3
                     losses1.update(loss1)
                     losses2.update(loss2)
+                    losses3.update(loss3)
                     losses.update(loss)
 
                     output_tmp = F.softmax(output, dim=1)
@@ -172,7 +173,7 @@ class Tester:
             batch_time.update(time.time() - starttime)
             starttime = time.time()
 
-            bar.suffix = '({batch}/{size}) Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss: {loss:.4f},loss1: {loss1:.4f},loss2: {loss2:.4f}| Acc: {Acc:.4f} | mIoU: {mIoU: .4f},maxIoU:{maxIoU:.4f},idx:{index1},minIoU:{minIoU:.4f},idx:{index2} | kappa: {kappa: .4f}'.format(
+            bar.suffix = '({batch}/{size}) Batch:{bt:.3f}s | Total:{total:} | ETA:{eta:} | Loss:{loss:.4f},loss1:{loss1:.4f},loss2:{loss2:.4f},loss3:{loss3:.4f} | Acc:{Acc:.4f} | mIoU:{mIoU: .4f},maxIoU:{maxIoU:.4f},idx:{index1},minIoU:{minIoU:.4f},idx:{index2} | kappa: {kappa: .4f}'.format(
                 batch=idx + 1,
                 size=len(self.test_loader),
                 bt=batch_time.avg,
@@ -181,6 +182,7 @@ class Tester:
                 loss=losses.avg,
                 loss1=losses1.avg,
                 loss2=losses2.avg,
+                loss3=losses3.avg,
                 mIoU=self.val_metric.miou.get()[0],
                 maxIoU=self.val_metric.miou.get()[1],
                 index1=self.val_metric.miou.get()[2][0],
@@ -199,10 +201,9 @@ class Tester:
 
     def save_image(self, output, img_file):
         output = torch.argmax(output, dim=1).cpu().numpy()
-        for i in range(output.shape[0]):
-            output_rgb_tmp = decode_segmap(output[i], self.num_classes).astype(np.uint8)
-            output_rgb_tmp =Image.fromarray(output_rgb_tmp)
-            output_rgb_tmp.save(os.path.join(self.final_save_path, img_file[i].replace('npy', 'tif')))
+        output_rgb_tmp = decode_segmap(output[0], self.num_classes).astype(np.uint8)
+        output_rgb_tmp =Image.fromarray(output_rgb_tmp)
+        output_rgb_tmp.save(os.path.join(self.final_save_path, img_file[0].replace('npy', 'tif')))
 
 
 # def test():
@@ -215,9 +216,9 @@ class Tester:
 
 def test():
     save_result_path = '/home/mist/rssrai/results/'
-    param_path = '/home/mist/rssrai_model_saving/unet-resnet50_False_False.pth'
+    param_path = '/home/mist/rssrai_model_saving/unet-resnet50_True_False.pth'
     torch.load(param_path)
-    tester = Tester(Args, param_path, save_result_path, 1, use_threshold=False)
+    tester = Tester(Args, param_path, save_result_path, 1, use_threshold=True)
 
     print("==> Start testing")
     tester.testing()

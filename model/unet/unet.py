@@ -238,6 +238,8 @@ class UNet(nn.Module):
             self.up3 = Up(128, 192, 64, bilinear=self.bilinear)
             self.up4 = Up(64, 128, 64, bilinear=self.bilinear, last_cat=True)
             self.up5 = Up(64, 68, 64, bilinear=self.bilinear)
+            self.up_weights = Up(64, 68, 64, bilinear=self.bilinear)
+            self.weight_conv = nn.Conv2d(64, 16, 1)
 
         self.outconv = Double_conv(64, self.num_classes)
 
@@ -275,6 +277,19 @@ class UNet(nn.Module):
             x = self.up4(x1, x0)
             x = self.up5(x, ori_x)
 
+        elif self.use_threshold:
+            x = self.up1(x4, x3)
+            x = self.up2(x, x2)
+            x = self.up3(x, x1)
+            x = self.up4(x, x0)
+            x_out = self.up5(x, ori_x)
+            x_weights = self.up_weights(x, ori_x)
+            x_weights = self.weight_conv(x_weights)
+
+            output = self.outconv(x_out)
+            x_weights = (x_weights.permute(2, 3, 0, 1) * ratios).permute(2, 3, 0, 1)
+            output_ = x_weights + output
+
         else:
             x = self.up1(x4, x3)
             x = self.up2(x, x2)
@@ -282,9 +297,9 @@ class UNet(nn.Module):
             x = self.up4(x, x0)
             x = self.up5(x, ori_x)
 
-        output = self.outconv(x)
+            output = self.outconv(x)
 
-        return (output, ratios) if self.use_threshold else output
+        return (output, output_, ratios) if self.use_threshold else output
 
     def freeze_backbone(self):
         for param in self.down.layer1.parameters():

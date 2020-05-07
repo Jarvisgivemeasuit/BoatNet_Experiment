@@ -87,7 +87,7 @@ def get_labels(label_number):
 def make_dataset(dataset):
     if dataset == "rssrai":
         train_set = rssrai.Rssrai(mode='train')
-        val_set = rssrai.Rssrai(mode='val')
+        val_set = rssrai.Rssrai(mode='test')
     else:
         train_set = rssrai2.Rssrai(mode='train')
         val_set = rssrai2.Rssrai(mode='val')
