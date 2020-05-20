@@ -90,7 +90,7 @@ def make_dataset(dataset):
         val_set = rssrai.Rssrai(mode='val')
     else:
         train_set = rssrai2.Rssrai(mode='train')
-        val_set = rssrai2.Rssrai(mode='val')
+        val_set = rssrai2.Rssrai(mode='test')
     return train_set, val_set, train_set.NUM_CLASSES
 
 

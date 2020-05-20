@@ -98,7 +98,6 @@ class Rssrai(Dataset):
 
     def _valid_enhance(self, sample):
         compose = A.Compose([
-            # A.Normalize(mean=(0.54010072, 0.40851444, 0.4173501 , 0.38801662), std=(0.54010072, 0.40851444, 0.4173501, 0.38801662), p=1)
             A.Normalize(mean=(0.52599181, 0.37223402, 0.39633026, 0.36051684), std=(0.24623929, 0.24797055, 0.23415287, 0.23056658))
         ], additional_targets={'image': 'image', 'label': 'mask'})
         sample['image'] = sample['image'].transpose((1, 2, 0))
@@ -106,14 +105,10 @@ class Rssrai(Dataset):
 
     def _train_enhance(self, sample):
         compose = A.Compose([
-            # A.HorizontalFlip(p=0.5),
-            # A.ShiftScaleRotate(p=0.5),
-            # A.RandomBrightnessContrast(p=0.5),
-            # A.RGBShift(p=0.5),
-            # A.Blur(p=0.5),
-            # A.GaussNoise(p=0.5),
-            # A.ElasticTransform(p=0.5),
-            # A.Cutout(p=0.3),
+            A.HorizontalFlip(p=0.5),
+            A.VerticalFlip(p=0.5),
+            A.RandomRotate90(p=0.5),
+            A.Blur(p=1),
             A.Normalize(mean=self.mean, std=self.std, p=1),
         ], additional_targets={'image': 'image', 'label': 'mask'})
         sample['image'] = sample['image'].transpose((1, 2, 0))
@@ -122,6 +117,6 @@ class Rssrai(Dataset):
     def _test_enhance(self, sample):
         # image = image.transpose(1, 2, 0)
         norm = A.Compose([
-            A.Normalize(mean=(0.49283749, 0.337761, 0.3473801 , 0.33598172), std=(0.25492469, 0.22505004, 0.20915616, 0.21764152), p=1)],
+            A.Normalize(mean=self.mean, std=self.std, p=1)],
             additional_targets={'image': 'image', 'label': 'mask'})
         return norm(**sample)

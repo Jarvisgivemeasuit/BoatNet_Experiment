@@ -60,13 +60,10 @@ class Trainer:
         #                                                                         1.2,2,0.8,1.2,
         #                                                                         1.1,0.5,1.1,2,
         #                                                                         1.2,0.8,1.2,0.8])).float()).cuda()
-        self.criterion1 = nn.CrossEntropyLoss(weight=torch.from_numpy(np.array([1,0.5,0.5,1.1,
-                                                                                1.2,3,0.8,1.3,
-                                                                                1.1,0.4,1.1,2.5,
-                                                                                1.2,0.8,1.2,0.8])).float()).cuda()
+        self.criterion1 = nn.CrossEntropyLoss().cuda()
         self.criterion2 = SoftCrossEntropyLoss(times=1).cuda()
         # self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, mode='min', factor=0.3, patience=3)
-        self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(self.optimizer, T_max=self.args.epochs, eta_min=5e-5)
+        self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, 20, 0.3)
 
         self.Metric = namedtuple('Metric', 'pixacc miou kappa')
 
@@ -231,8 +228,7 @@ class Trainer:
             self.val_metric.miou.update(output, tar)
             self.val_metric.kappa.update(output, tar)
 
-            if idx % 5 == 0:
-                self.visualize_batch_image(img, tar, output, epoch, idx)
+            self.visualize_batch_image(img, tar, output, epoch, idx)
 
             batch_time.update(time.time() - starttime)
             starttime = time.time()
@@ -333,7 +329,7 @@ def train():
         trainer.training(epoch)
         if not args.no_val:
             new_pred = trainer.validation(epoch)
-            trainer.scheduler.step(new_pred)
+            trainer.scheduler.step(epoch)
             # trainer.auto_reset_learning_rate()
 
 
