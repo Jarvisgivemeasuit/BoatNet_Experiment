@@ -54,7 +54,7 @@ class MeanIoU:
             self.num_intersection[cur_cls] += intersection.item()
             self.num_union[cur_cls] += union.item()
 
-    def get(self, ignore_background=True):
+    def get(self, ignore_background=False):
         if ignore_background:
             iou_list = (self.num_intersection[:-1] / (self.num_union[:-1] + self.eps))
             return iou_list.mean(), iou_list.max(), np.where(iou_list == iou_list.max()), iou_list.min(), np.where(iou_list == iou_list.min())
@@ -67,7 +67,7 @@ class MeanIoU:
         self.num_union = np.zeros(self.num_classes)
     
     def get_all(self):
-        return (self.num_intersection[:-1] / (self.num_union[:-1] + self.eps))
+        return (self.num_intersection / (self.num_union + self.eps))
 
 
 class Kappa:

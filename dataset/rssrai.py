@@ -41,9 +41,12 @@ class Rssrai(Dataset):
             self.len = len(self._data_list)
 
         if self._mode == 'test':
-            self._image_dir = os.path.join(self._base_dir, 'test_split', 'img')
-            self._label_dir = os.path.join(self._base_dir, 'test_split', 'mask')
-            self._ratios_dir = os.path.join(self._base_dir, 'test_split', 'ratios')
+            # self._image_dir = os.path.join(self._base_dir, 'test_split', 'img')
+            # self._label_dir = os.path.join(self._base_dir, 'test_split', 'mask')
+            # self._ratios_dir = os.path.join(self._base_dir, 'test_split', 'ratios')
+            self._image_dir = os.path.join(self._base_dir, 'test_split_256', 'img')
+            self._label_dir = os.path.join(self._base_dir, 'test_split_256', 'mask')
+            self._ratios_dir = os.path.join(self._base_dir, 'test_split_256', 'ratios')
             self._data_list = os.listdir(self._image_dir)
             for data in self._data_list:
                 if data[-3:] != 'npy':
@@ -105,12 +108,12 @@ class Rssrai(Dataset):
 
     def _train_enhance(self, sample):
         compose = A.Compose([
-            A.Resize(320, 320, p=1),
             A.HorizontalFlip(p=0.5),
             A.VerticalFlip(p=0.5),
             A.RandomRotate90(p=0.5),
             A.Transpose(p=0.5),
             A.ElasticTransform(p=0.5),
+            A.Blur(p=0.5),
             A.Cutout(p=0.5),
             A.Normalize(mean=self.mean, std=self.std, p=1),
         ], additional_targets={'image': 'image', 'label': 'mask'})

@@ -4,6 +4,7 @@ import sys
 
 from progress.bar import Bar
 from PIL import Image
+import matplotlib.pyplot as plt
 from collections import namedtuple
 
 sys.path.append("/home/arron/Documents/grey/paper/experiment")
@@ -141,8 +142,7 @@ class Tester:
                 img, tar, ratios = img.cuda(), tar.cuda(), ratios.cuda()
             with torch.no_grad():
                 if self.use_threshold:
-                    [output, output_, output_ratios] = self.net(img)
-
+                    [output, output_, x_weights, output_ratios] = self.net(img)
                     loss1 = self.criterion1(output, tar.long())
                     loss2 = self.criterion1(output_, tar.long())
                     loss3 = self.criterion2(output_ratios, ratios.float())
@@ -152,23 +152,33 @@ class Tester:
                     losses3.update(loss3)
                     losses.update(loss)
 
-                    output_tmp = F.softmax(output, dim=1)
-                    output_tmp = output.permute(2, 3, 0, 1)
-                    output_ratios = F.softmax(output_ratios, dim=1)
-                    dynamic = output_tmp > (1 - output_ratios) / (self.num_classes - 1)
-                    dynamic = dynamic.permute(2, 3, 0, 1)
-                    output_tmp = output_tmp.permute(2, 3, 0, 1)
-                    output = output_tmp * dynamic.float()
+                    # output_tmp = F.softmax(output, dim=1)
+                    # output_tmp = output.permute(2, 3, 0, 1)
+                    # output_ratios = F.softmax(output_ratios, dim=1)
+                    # dynamic = output_tmp > (1 - output_ratios) / (self.num_classes - 1)
+                    # dynamic = dynamic.permute(2, 3, 0, 1)
+                    # output_tmp = output_tmp.permute(2, 3, 0, 1)
+                    # output = output_tmp * dynamic.float()
                 else:
                     output = self.net(img)
                     loss = self.criterion1(output, tar.long())
                     losses.update(loss)
 
-            self.val_metric.pixacc.update(output, tar)
-            self.val_metric.miou.update(output, tar)
-            self.val_metric.kappa.update(output, tar)
+                print()
+                ratios = F.softmax(output_ratios, dim=1)
+                atten = (x_weights.expand(output.shape).permute(2, 3, 0, 1) * ratios).permute(2, 3, 0, 1)
+                print(output_[output_ > 0].mean())
+                atten = atten / atten.std() * output_.std()
+                # print(output_[0, :, 0, 0], atten[0, :, 0, 0])
+                
 
-            self.save_image(output, img_file)
+            self.val_metric.pixacc.update(output_ + atten, tar)
+            self.val_metric.miou.update(output_ + atten, tar)
+            self.val_metric.kappa.update(output_ + atten, tar)
+            if self.use_threshold:
+                self.save_image(output, img_file, x_weights)
+            else:
+                self.save_image(output, img_file)
 
             batch_time.update(time.time() - starttime)
             starttime = time.time()
@@ -199,11 +209,20 @@ class Tester:
 
         print(self.val_metric.miou.get_all())
 
-    def save_image(self, output, img_file):
+    def save_image(self, output, img_file, x_weights=None):
         output = torch.argmax(output, dim=1).cpu().numpy()
         output_rgb_tmp = decode_segmap(output[0], self.num_classes).astype(np.uint8)
         output_rgb_tmp =Image.fromarray(output_rgb_tmp)
         output_rgb_tmp.save(os.path.join(self.final_save_path, img_file[0].replace('npy', 'tif')))
+        if self.use_threshold:
+            x_weights = x_weights[0][0].cpu().numpy()
+            # x_weights = Image.fromarray(x_weights)
+            # plt.figure()
+            # plt.imshow(x_weights)
+            # plt.savefig(os.path.join(self.final_save_path, img_file[0].replace('.npy', '_ratios.tif')))
+            # plt.close('all')
+            np.save(os.path.join(self.final_save_path, img_file[0].replace('.npy', '_ratios')), x_weights)
+            # x_weights.save(os.path.join(self.final_save_path, img_file[0].replace('.npy', '_ratios.tif')))
 
 
 # def test():
@@ -216,7 +235,8 @@ class Tester:
 
 def test():
     save_result_path = '/home/mist/rssrai/results/'
-    param_path = '/home/mist/rssrai_model_saving/unet-resnet50_True_False.pth'
+    param_path = '/home/mist/rssrai_model_saving/pspnet-resnet50_True_False.pth'
+    # param_path = '/home/mist/rssrai_model_saving/unet-resnet50_True_False.pth'
     torch.load(param_path)
     tester = Tester(Args, param_path, save_result_path, 1, use_threshold=True)
 

@@ -3,14 +3,15 @@ import os
 class Args:
 
     def __init__(self):
-        self.tr_batch_size = 28
+        self.tr_batch_size = 32
         self.vd_batch_size = 1
+
         self.num_workers = 8
         self.inplanes = 4
 
         self.use_threshold = True
         self.use_gcn = False
-        self.model_name = 'unet'
+        self.model_name = 'somenet'
         self.backbone = 'resnet50'
 
         self.epochs = 100
@@ -24,5 +25,5 @@ class Args:
         self.apex = True
 
         self.vis_image_dir = '/home/mist/rssrai/vis_image/'
-        self.board_dir = 'unet_thres'
+        self.board_dir = 'net_thres'
         # self.vis_image_dir = '/home/arron/Documents/grey/paper/vis_image/'
