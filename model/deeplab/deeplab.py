@@ -49,11 +49,7 @@ class Resnet(nn.Module):
         self.layer3 = model.layer3
         self.layer4 = model.layer4
 
-        for m in self.layer4.modules():
-            if isinstance(m, nn.Conv2d):
-                if m.kernel_size == (3, 3):
-                    m.padding = (2, 2)
-                    m.dilation = (2, 2)
+        self.change_dilation([1, 1, 1, 2, 4])
 
         if not pretrained:
             initialize_weights(self)
@@ -66,14 +62,30 @@ class Resnet(nn.Module):
         self.chd = ChDecrease(2048, 4)
 
     def forward(self, x):
-        low_level_features = self.layer0(x)
-        x = self.layer1(low_level_features)
-        x = self.layer2(x)
+        x0 = self.layer0(x)
+        x1 = self.layer1(x0)
+        x = self.layer2(x1)
         x = self.layer3(x)
         x = self.layer4(x)
         output = self.chd(x)
 
-        return output, low_level_features
+        return x0, x1, output
+
+    def change_dilation(self, params):
+        assert isinstance(params, (tuple, list))
+        assert len(params) == 5
+        self._change_stage_dilation(self.layer0, params[0])
+        self._change_stage_dilation(self.layer1, params[1])
+        self._change_stage_dilation(self.layer2, params[2])
+        self._change_stage_dilation(self.layer3, params[3])
+        self._change_stage_dilation(self.layer4, params[4])
+
+    def _change_stage_dilation(self, stage, param):
+        for m in stage.modules():
+            if isinstance(m, nn.Conv2d):
+                if m.kernel_size == (3, 3):
+                    m.padding = (param, param)
+                    m.dilation = (param, param)
 
 
 class ASPP(nn.Module):
@@ -128,19 +140,14 @@ class ASPP(nn.Module):
 class Pred_Fore_Rate(nn.Module):
     def __init__(self):
         super().__init__()
-        self.de_ratio = ChDecrease(512, 32)
         self.conv = nn.Sequential(
-            nn.Conv2d(16, 16, 3, stride=2, padding=1),
+            nn.Conv2d(512, 16, 3, padding=1),
             nn.BatchNorm2d(16),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(16, 16, 3, stride=2, padding=1),
-            nn.BatchNorm2d(16),
-            nn.ReLU(inplace=True)
+            nn.LeakyReLU(inplace=True)
         )
         self.pool = nn.AdaptiveAvgPool2d(1)
 
     def forward(self, x):
-        x = self.de_ratio(x)
         x = self.conv(x)
         x = self.pool(x)
         x = x.reshape(x.shape[0], x.shape[1])
@@ -172,25 +179,66 @@ class DeepLabV3Plus(nn.Module):
             nn.Conv2d(256, num_classes, 1, bias=False),
         )
         self.ratios = Pred_Fore_Rate()
+        self.weight_conv2 = nn.Sequential(
+            nn.Conv2d(320, 1, 1),
+            # nn.BatchNorm2d(1),
+            # nn.LeakyReLU(inplace=True),
+            # nn.Conv2d(1, 1, 3, padding=1)
+            )
+        self.sigmoid = nn.Sigmoid()
+        # self.fine_tuning = nn.Conv2d(num_classes, num_classes, 1)
         self.use_threshold = use_threshold
 
     def forward(self, x):
-        x, low_level_features = self.backbone(x)
+        ori_x = x
+        size = (x.shape[2] // 2, x.shape[3] // 2)
+        low_level_features, x1, x = self.backbone(x)
         if self.use_threshold:
-            output_ratios = self.ratios(x)
-        aspp_out = self.aspp(x)
-        aspp_out = F.interpolate(aspp_out,
-                                 scale_factor=8,
-                                 mode='bilinear',
-                                 align_corners=True)
-        low_level_features = self.low_level_conv(low_level_features)
-        out = torch.cat((aspp_out, low_level_features), dim=1)
-        out = self.concat_conv(out)
-        out = F.interpolate(out,
-                            scale_factor=2,
-                            mode='bilinear',
-                            align_corners=True)
-        return out, output_ratios
+            ratios = self.ratios(x)
+            aspp_out = self.aspp(x)
+            aspp_out = F.interpolate(aspp_out,
+                                    size=size,
+                                    mode='bilinear',
+                                    align_corners=True)
+            x_weights = torch.cat([low_level_features, x1], dim=1)
+            x_weights = F.interpolate(x_weights,
+                              scale_factor=2,
+                              mode='bilinear',
+                              align_corners=True)
+            x_weights = self.weight_conv2(x_weights)
+            # x_weights = self.sigmoid(x_weights) * 2 - 1
+            # print((x_weights < 0).sum())
+
+            low_level_features = self.low_level_conv(low_level_features)
+            out = torch.cat((aspp_out, low_level_features), dim=1)
+            out = self.concat_conv(out)
+            out = F.interpolate(out,
+                                scale_factor=2,
+                                mode='bilinear',
+                                align_corners=True)
+
+            ratios_ = ratios.clone().detach()
+            ratios_ = F.softmax(ratios_, dim=1)
+
+            output = out.clone().detach()
+            # x_weights = x_weights * output.std()
+            atten = (x_weights.expand(output.shape).permute(2, 3, 0, 1) * ratios_).permute(2, 3, 0, 1) * output[output > 0].mean()
+            # atten = atten / atten.std()  * output.std()
+            output = out + atten
+        else:
+            aspp_out = self.aspp(x)
+            aspp_out = F.interpolate(aspp_out,
+                                    size=size,
+                                    mode='bilinear',
+                                    align_corners=True)
+            low_level_features = self.low_level_conv(low_level_features)
+            out = torch.cat((aspp_out, low_level_features), dim=1)
+            out = self.concat_conv(out)
+            out = F.interpolate(out,
+                                scale_factor=2,
+                                mode='bilinear',
+                                align_corners=True)
+        return (output, out, x_weights, ratios) if self.use_threshold else out
 
     def reset_classes(self, num_classes):
         self.num_classes = num_classes

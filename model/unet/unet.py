@@ -94,19 +94,14 @@ class BR(nn.Module):
 class Pred_Fore_Rate(nn.Module):
     def __init__(self):
         super().__init__()
-        self.de_ratio = ChDecrease(2048, 128)
         self.conv = nn.Sequential(
-            nn.Conv2d(16, 16, 3, stride=2, padding=1),
-            nn.BatchNorm2d(16),
-            nn.LeakyReLU(inplace=True),
-            nn.Conv2d(16, 16, 3, stride=2, padding=1),
+            nn.Conv2d(2048, 16, 3, padding=1),
             nn.BatchNorm2d(16),
             nn.LeakyReLU(inplace=True)
         )
         self.pool = nn.AdaptiveAvgPool2d(1)
 
     def forward(self, x):
-        x = self.de_ratio(x)
         x = self.conv(x)
         x = self.pool(x)
         x = x.reshape(x.shape[0], x.shape[1])
@@ -237,7 +232,11 @@ class UNet(nn.Module):
             self.up2 = Up(256, 384, 128, bilinear=self.bilinear)
             self.up3 = Up(128, 192, 64, bilinear=self.bilinear)
             self.up4 = Up(64, 128, 64, bilinear=self.bilinear, last_cat=True)
-            self.up5 = Up(64, 68, 64, bilinear=self.bilinear)
+            self.up5 = nn.Upsample(scale_factor=2, mode="bilinear", align_corners=True)
+
+            # self.up_weights = Up(64, 68, 64, bilinear=self.bilinear)
+            self.weight_conv = nn.Conv2d(128, 1, 1)
+            self.sigmoid = nn.Sigmoid()
 
         self.outconv = Double_conv(64, self.num_classes)
 
@@ -275,16 +274,47 @@ class UNet(nn.Module):
             x = self.up4(x1, x0)
             x = self.up5(x, ori_x)
 
+        elif self.use_threshold:
+            x = self.up1(x4, x3)
+            x = self.up2(x, x2)
+            x = self.up3(x, x1)
+            x = self.up4(x, x0)
+            x_out = self.up5(x)
+
+            # x_weights = F.interpolate(x2,
+            #                   scale_factor=2,
+            #                   mode='bilinear',
+            #                   align_corners=True)
+            x_weights = torch.cat([x0, x1], dim=1)
+            x_weights = F.interpolate(x_weights,
+                              scale_factor=2,
+                              mode='bilinear',
+                              align_corners=True)
+            # x_weights = torch.cat([ori_x, x_weights], dim=1)
+            x_weights = self.weight_conv(x_weights)
+            x_weights = self.sigmoid(x_weights) * 2 - 1
+
+            output = self.outconv(x_out)
+            # channel_ = x_weights.expand(output.shape) * output
+            # # ratios_ = ratios.clone().detach()
+            # ratios = F.softmax(ratios, dim=1)
+            # spatial_ = (output.permute(2, 3, 0, 1) * ratios).permute(2, 3, 0, 1)
+            # output_ = channel_ + spatial_
+            ratios_ = ratios.clone().detach()
+            ratios_ = F.softmax(ratios, dim=1)
+
+            output_ = output.clone().detach()
+            output_ = output_ + (x_weights.expand(output.shape).permute(2, 3, 0, 1) * ratios_).permute(2, 3, 0, 1) * output_
         else:
             x = self.up1(x4, x3)
             x = self.up2(x, x2)
             x = self.up3(x, x1)
             x = self.up4(x, x0)
-            x = self.up5(x, ori_x)
+            x = self.up5(x)
 
-        output = self.outconv(x)
+            output = self.outconv(x)
 
-        return (output, ratios) if self.use_threshold else output
+        return (output_, output, x_weights, ratios) if self.use_threshold else output
 
     def freeze_backbone(self):
         for param in self.down.layer1.parameters():

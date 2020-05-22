@@ -87,7 +87,7 @@ def get_labels(label_number):
 def make_dataset(dataset):
     if dataset == "rssrai":
         train_set = rssrai.Rssrai(mode='train')
-        val_set = rssrai.Rssrai(mode='val')
+        val_set = rssrai.Rssrai(mode='test')
     else:
         train_set = rssrai2.Rssrai(mode='train')
         val_set = rssrai2.Rssrai(mode='test')
@@ -277,11 +277,15 @@ class SuperMerger:
 
 class SoftCrossEntropyLoss(nn.Module):
 
-    def __init__(self, ignore_index=-1, times=1, eps=1e-7):
+    def __init__(self, ignore_index=-1, times=1, eps=1e-7, weight=None):
         super().__init__()
         self.ignore_index = ignore_index
         self.times = times
         self.eps = eps
+        if weight is None:
+            self.weight = weight
+        else:
+            self.weight = weight.cuda()
 
     def forward(self, pred, target):
         mask = target != self.ignore_index
@@ -289,7 +293,10 @@ class SoftCrossEntropyLoss(nn.Module):
         loss = -pred * target
         loss = loss * mask.float()
         # print(loss, pred, target, mask)
-        return self.times * loss.sum() / (mask.sum() + self.eps)
+        if self.weight is None:
+            return self.times * loss.sum() / (mask.sum() + self.eps)
+        else:
+            return self.times * (self.weight * loss).sum() / (mask.sum() + self.eps)
 
 
 class Circumference(nn.Module):
