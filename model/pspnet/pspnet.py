@@ -60,12 +60,12 @@ class Resnet(nn.Module):
     def forward(self, x):
         x = self.layer0(x)
         x = self.layer1(x)
-        x = self.layer2(x)
-        x = self.layer3(x)
+        x_ = self.layer2(x)
+        x = self.layer3(x_)
         x = self.layer4(x)
         output = self.chd(x)
 
-        return output
+        return output,x_
 
     def change_dilation(self, params):
         assert isinstance(params, (tuple, list))
@@ -178,15 +178,21 @@ class Position_Weights(nn.Module):
             nn.LeakyReLU(inplace=True),
             nn.Conv2d(NUM_CLASSES, 1, 3, padding=1),
             nn.BatchNorm2d(1),
-            nn.LeakyReLU(inplace=True))
-        self.out_conv = nn.Conv2d(2, 1, 1)
+            nn.LeakyReLU(inplace=True)
+            )
+        self.out_conv = nn.Conv2d(1, 1, 1)
 
-    def forward(self, x, x_weights, feats):
+    def forward(self, x, feats):
         x = self.conv(x)
-        x = torch.cat([x, x_weights], dim=1)
+        # x = torch.cat([x, x_weights], dim=1)
+        # x = x + x_weights
         x = self.out_conv(x)
+        x = F.interpolate(x,
+                    size=feats.shape[2:],
+                    mode='bilinear',
+                    align_corners=True)
         x = torch.sigmoid(x)
-        return x * feats
+        return x * feats, x
 
 
 class PSPNet(nn.Module):
@@ -214,13 +220,13 @@ class PSPNet(nn.Module):
             nn.Conv2d(1, 1, 1)
             )
 
-        self.position_conv = Position_Weights(4)
+        self.position_conv = Position_Weights(512)
         self.use_threshold = use_threshold
 
     def forward(self, x):
         ori_x = x
         size = (x.shape[2], x.shape[3])
-        x = self.backbone(x)
+        x, x_ = self.backbone(x)
         if self.use_threshold:
             ratios = self.ratios(x)
 
@@ -235,12 +241,12 @@ class PSPNet(nn.Module):
 
             out = self.out_conv(x)
 
-            x_weights = self.weight_conv(x)
+            # x_weights = self.weight_conv(x)
             ratios_ = torch.sigmoid(ratios)
-            # x_weights_ = x_weights.clone().detach()
-            posi_feat = self.position_conv(ori_x, x_weights, out)
+            posi_feat, x_weights = self.position_conv(x_, out)
 
             output = out * ratios_ + posi_feat
+            ratios = ratios.reshape(x.shape[0], x.shape[1])
 
             # ratios_ = ratios.clone().detach()
             # ratios_ = F.softmax(ratios, dim=1)
@@ -260,7 +266,6 @@ class PSPNet(nn.Module):
             #                         mode='nearest')
             # dist = torch.log(output_ratios * torch.exp(ratios_).sum(dim=1).reshape(ratios_.shape[0], 1, ratios_.shape[2], ratios_.shape[3]).expand(ratios_.shape) + 1e-4)
             # output = out1 +  (ratios_ - dist) * out2
-            ratios = ratios.reshape(x.shape[0], x.shape[1])
             # output = output + (x_weights.expand(output.shape).permute(2, 3, 0, 1) * ratios_).permute(2, 3, 0, 1)
         else:
             x = self.ppm(x)
@@ -272,7 +277,7 @@ class PSPNet(nn.Module):
                                 mode='bilinear',
                                 align_corners=True)
 
-        return (output, posi_feat, x_weights, ratios) if self.use_threshold else out
+        return (output, out, x_weights, ratios) if self.use_threshold else out
         # return out1, out2
 
     def freeze_backbone(self):

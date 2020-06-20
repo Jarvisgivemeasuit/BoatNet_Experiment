@@ -38,7 +38,9 @@ class Tester:
         self.criterion2 = SoftCrossEntropyLoss().cuda()
 
         # self.save_path = make_sure_path_exists(os.path.join(save_path, "tmp"))
-        self.final_save_path = make_sure_path_exists(os.path.join(save_path, "unet-resnet50"))
+        # self.final_save_path = make_sure_path_exists(os.path.join(save_path, "unet-resnet50"))
+        self.final_save_path = make_sure_path_exists(save_path)
+
         self.Metric = namedtuple('Metric', 'pixacc miou kappa')
         self.val_metric = self.Metric(pixacc=metrics.PixelAccuracy(),
                                 miou=metrics.MeanIoU(self.num_classes),
@@ -170,15 +172,16 @@ class Tester:
                 # print(output_[output_ > 0].mean())
                 # atten = atten / atten.std() * output_.std()
                 # print(output_[0, :, 0, 0], atten[0, :, 0, 0])
-                
+            # output = (output - output_) * (1 / output_ratios.reshape(1, 16, 1, 1))
+            # print(output.dtype)
 
-            self.val_metric.pixacc.update(output_, tar)
-            self.val_metric.miou.update(output_, tar)
-            self.val_metric.kappa.update(output_, tar)
-            # if self.use_threshold:
-            #     self.save_image(output, img_file, x_weights)
-            # else:
-            #     self.save_image(output, img_file)
+            self.val_metric.pixacc.update(output, tar)
+            self.val_metric.miou.update(output, tar)
+            self.val_metric.kappa.update(output, tar)
+            if self.use_threshold:
+                self.save_image(output, img_file, x_weights)
+            else:
+                self.save_image(output, img_file)
 
             batch_time.update(time.time() - starttime)
             starttime = time.time()
@@ -234,9 +237,9 @@ class Tester:
 #     tester.testing()
 
 def test():
-    save_result_path = '/home/grey/datasets/rssrai/results/'
-    param_path = '/home/grey/Documents/rssrai_model_saving/pspnet-resnet50_True_False.pth'
-    # param_path = '/home/mist/rssrai_model_saving/unet-resnet50_True_False.pth'
+    save_result_path = '/home/grey/datasets/rssrai/results/pspnet-feat'
+    param_path = '/home/grey/datasets/rssrai/results/pspnet-feat/pspnet-resnet50_True_False.pth'
+    # param_path = '/home/grey/Documents/rssrai_model_saving/pspnet-resnet50_False_False.pth'
     torch.load(param_path)
     tester = Tester(Args, param_path, save_result_path, 1, use_threshold=True)
 

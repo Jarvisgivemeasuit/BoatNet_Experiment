@@ -91,20 +91,21 @@ class BR(nn.Module):
         return x + x_res
 
 
-class Pred_Fore_Rate(nn.Module):
+class Pred_Ratios(nn.Module):
     def __init__(self):
         super().__init__()
         self.conv = nn.Sequential(
-            nn.Conv2d(2048, 16, 3, padding=1),
-            nn.BatchNorm2d(16),
+            nn.Conv2d(512, NUM_CLASSES, 3, padding=1),
+            nn.BatchNorm2d(NUM_CLASSES),
             nn.LeakyReLU(inplace=True)
         )
         self.pool = nn.AdaptiveAvgPool2d(1)
 
     def forward(self, x):
         x = self.conv(x)
+        # fea_map = x
         x = self.pool(x)
-        x = x.reshape(x.shape[0], x.shape[1])
+        # x = x.reshape(x.shape[0], x.shape[1])
 
         return x
 
@@ -192,6 +193,28 @@ class ChDecrease(nn.Module):
         return x
 
 
+class Position_Weights(nn.Module):
+    def __init__(self, inplanes):
+        super().__init__()
+        self.conv = nn.Sequential(
+            nn.Conv2d(inplanes, NUM_CLASSES, 3, padding=1),
+            nn.BatchNorm2d(NUM_CLASSES),
+            nn.LeakyReLU(inplace=True),
+            nn.Conv2d(NUM_CLASSES, 1, 3, padding=1),
+            nn.BatchNorm2d(1),
+            nn.LeakyReLU(inplace=True)
+            )
+        self.out_conv = nn.Conv2d(1, 1, 1)
+
+    def forward(self, x, feats):
+        x = self.conv(x)
+        # x = torch.cat([x, x_weights], dim=1)
+        # x = x + x_weights
+        x = self.out_conv(x)
+        x = torch.sigmoid(x)
+        return x * feats, x
+
+
 class UNet(nn.Module):
     def __init__(self, inplanes, num_classes, backbone, use_threshold, use_gcn, bilinear=True):
         super().__init__()
@@ -208,103 +231,83 @@ class UNet(nn.Module):
             self.de3 = ChDecrease(1024, 4)
             self.de4 = ChDecrease(2048, 4)
 
-        self.fore_pred = Pred_Fore_Rate()
+        self.fore_pred = Pred_Ratios()
+        self.posi_conv = Position_Weights(4)
+        self.sigmoid = nn.Sigmoid()
 
-        if self.use_gcn:
-            self.gcn1 = GCN(512)
-            self.gcn2 = GCN(256)
-            self.gcn3 = GCN(128)
-            self.gcn4 = GCN(64)
+        # if self.use_gcn:
+        #     self.gcn1 = GCN(512)
+        #     self.gcn2 = GCN(256)
+        #     self.gcn3 = GCN(128)
+        #     self.gcn4 = GCN(64)
 
-            self.br = BR()
+        #     self.br = BR()
 
-            # self.up = Up_Gcn()
-            # self.up1 = Up(NUM_CLASSES, 64 + NUM_CLASSES, 64)
-            # self.up2 = Up(64, 68, 64)
+        #     # self.up = Up_Gcn()
+        #     # self.up1 = Up(NUM_CLASSES, 64 + NUM_CLASSES, 64)
+        #     # self.up2 = Up(64, 68, 64)
 
-            self.up1 = Up_Gcn(512 + NUM_CLASSES)
-            self.up2 = Up_Gcn(256 + NUM_CLASSES)
-            self.up3 = Up_Gcn(128 + NUM_CLASSES)
-            self.up4 = Up(64 + NUM_CLASSES, 128 + NUM_CLASSES, 64)
-            self.up5 = Up(64, 68, 64)
-        else:
-            self.up1 = Up(512, 768, 256, bilinear=self.bilinear)
-            self.up2 = Up(256, 384, 128, bilinear=self.bilinear)
-            self.up3 = Up(128, 192, 64, bilinear=self.bilinear)
-            self.up4 = Up(64, 128, 64, bilinear=self.bilinear, last_cat=True)
-            self.up5 = nn.Upsample(scale_factor=2, mode="bilinear", align_corners=True)
+        #     self.up1 = Up_Gcn(512 + NUM_CLASSES)
+        #     self.up2 = Up_Gcn(256 + NUM_CLASSES)
+        #     self.up3 = Up_Gcn(128 + NUM_CLASSES)
+        #     self.up4 = Up(64 + NUM_CLASSES, 128 + NUM_CLASSES, 64)
+        #     self.up5 = Up(64, 68, 64)
+        # else:
+        self.up1 = Up(512, 768, 256, bilinear=self.bilinear)
+        self.up2 = Up(256, 384, 128, bilinear=self.bilinear)
+        self.up3 = Up(128, 192, 64, bilinear=self.bilinear)
+        self.up4 = Up(64, 128, 64, bilinear=self.bilinear, last_cat=True)
+        self.up5 = nn.Upsample(scale_factor=2, mode="bilinear", align_corners=True)
 
-            # self.up_weights = Up(64, 68, 64, bilinear=self.bilinear)
-            self.weight_conv = nn.Conv2d(128, 1, 1)
-            self.sigmoid = nn.Sigmoid()
+        # self.up_weights = Up(64, 68, 64, bilinear=self.bilinear)
+        self.weight_conv = nn.Conv2d(128, 1, 1)
+        self.sigmoid = nn.Sigmoid()
 
         self.outconv = Double_conv(64, self.num_classes)
 
     def forward(self, x):
         ori_x = x
         x0, x1, x2, x3, x4 = self.down(x)
-        if self.use_threshold:
-            ratios = self.fore_pred(x4).float()
-
         if self.backbone not in ['resnet18', 'resnet34']:
             x1 = self.de1(x1)
             x2 = self.de2(x2)
             x3 = self.de3(x3)
             x4 = self.de4(x4)
 
-        if self.use_gcn:
-            # x4 = self.br(self.gcn1(x4))
-            # x3 = self.br(self.gcn2(x3))
-            # x2 = self.br(self.gcn3(x2))
-            # x1 = self.br(self.gcn4(x1))
+        # if self.use_gcn:
+        #     # x4 = self.br(self.gcn1(x4))
+        #     # x3 = self.br(self.gcn2(x3))
+        #     # x2 = self.br(self.gcn3(x2))
+        #     # x1 = self.br(self.gcn4(x1))
 
-            # x = self.up(x4, x3)
-            # x = self.up(x, x2)
-            # x = self.up(x, x1)
-            # x = self.br(self.up1(x, x0))
-            # x = self.br(self.up2(x, ori_x))
+        #     # x = self.up(x4, x3)
+        #     # x = self.up(x, x2)
+        #     # x = self.up(x, x1)
+        #     # x = self.br(self.up1(x, x0))
+        #     # x = self.br(self.up2(x, ori_x))
 
-            x4 = torch.cat([x4, self.br(self.gcn1(x4))], dim=1)
-            x = self.up1(x4, self.br(self.gcn2(x3)))
-            x3 = torch.cat([x3, x], dim=1)
-            x = self.up2(x3, self.br(self.gcn3(x2)))
-            x2 = torch.cat([x2, x], dim=1)
-            x = self.up3(x2, self.br(self.gcn4(x1)))
-            x1 = torch.cat([x1, x], dim=1)
-            x = self.up4(x1, x0)
-            x = self.up5(x, ori_x)
+        #     x4 = torch.cat([x4, self.br(self.gcn1(x4))], dim=1)
+        #     x = self.up1(x4, self.br(self.gcn2(x3)))
+        #     x3 = torch.cat([x3, x], dim=1)
+        #     x = self.up2(x3, self.br(self.gcn3(x2)))
+        #     x2 = torch.cat([x2, x], dim=1)
+        #     x = self.up3(x2, self.br(self.gcn4(x1)))
+        #     x1 = torch.cat([x1, x], dim=1)
+        #     x = self.up4(x1, x0)
+        #     x = self.up5(x, ori_x)
 
-        elif self.use_threshold:
+        if self.use_threshold:
+            ratios = self.fore_pred(x4).float()
             x = self.up1(x4, x3)
             x = self.up2(x, x2)
             x = self.up3(x, x1)
             x = self.up4(x, x0)
             x_out = self.up5(x)
 
-            # x_weights = F.interpolate(x2,
-            #                   scale_factor=2,
-            #                   mode='bilinear',
-            #                   align_corners=True)
-            x_weights = torch.cat([x0, x1], dim=1)
-            x_weights = F.interpolate(x_weights,
-                              scale_factor=2,
-                              mode='bilinear',
-                              align_corners=True)
-            # x_weights = torch.cat([ori_x, x_weights], dim=1)
-            x_weights = self.weight_conv(x_weights)
-            x_weights = self.sigmoid(x_weights) * 2 - 1
+            x_out = self.outconv(x_out)
+            output, x_weights = self.posi_conv(ori_x, x_out)
+            output = x_out * ratios + output
 
-            output = self.outconv(x_out)
-            # channel_ = x_weights.expand(output.shape) * output
-            # # ratios_ = ratios.clone().detach()
-            # ratios = F.softmax(ratios, dim=1)
-            # spatial_ = (output.permute(2, 3, 0, 1) * ratios).permute(2, 3, 0, 1)
-            # output_ = channel_ + spatial_
-            ratios_ = ratios.clone().detach()
-            ratios_ = F.softmax(ratios, dim=1)
-
-            output_ = output.clone().detach()
-            output_ = output_ + (x_weights.expand(output.shape).permute(2, 3, 0, 1) * ratios_).permute(2, 3, 0, 1) * output_
         else:
             x = self.up1(x4, x3)
             x = self.up2(x, x2)
@@ -314,7 +317,7 @@ class UNet(nn.Module):
 
             output = self.outconv(x)
 
-        return (output_, output, x_weights, ratios) if self.use_threshold else output
+        return (output, x_out, x_weights, ratios) if self.use_threshold else output
 
     def freeze_backbone(self):
         for param in self.down.layer1.parameters():

@@ -58,16 +58,17 @@ class Trainer:
         # self.net = nn.DataParallel(self.net, self.args.gpu_ids)
 
         self.val_criterion = nn.CrossEntropyLoss().cuda()
-        self.criterion1 = nn.CrossEntropyLoss(weight=torch.from_numpy(np.array([1, 0.9, 0.9, 4,
-                                                                                1.2, 8, 0.8, 3,
-                                                                                2.5, 0.4, 1.1, 5,
-                                                                                1.2, 0.4, 1, 0.8])).float()).cuda()
+        self.criterion1 = nn.CrossEntropyLoss()
+        # self.criterion1 = nn.CrossEntropyLoss(weight=torch.from_numpy(np.array([1, 0.9, 0.9, 4,
+        #                                                                         1.2, 8, 0.8, 3,
+        #                                                                         2.5, 0.4, 1.1, 5,
+        #                                                                         1.2, 0.4, 1, 0.8])).float()).cuda()
 
         self.criterion2 = SoftCrossEntropyLoss().cuda()
         # lr_lambda = lambda tr_epoch:self.args.lr - (self.args.lr - 1e-6) / self.epochs * tr_epoch
         # self.scheduler = torch.optim.lr_scheduler.LambdaLR(self.optimizer, lr_lambda)
         # self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, [20, 40, 60, 80], 0.3)
-        self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(self.optimizer, T_max=self.args.epochs * len(self.train_loader), eta_min=1e-6)
+        self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(self.optimizer, T_max=self.args.epochs * len(self.train_loader), eta_min=1e-5)
 
         self.Metric = namedtuple('Metric', 'pixacc miou kappa')
 
@@ -120,12 +121,11 @@ class Trainer:
                 # output_ratios = self.net(img)
 
                 loss1 = self.criterion1(output, tar.long())
-                loss3 = self.criterion2(output_ratios, ratios.float())
                 with torch.no_grad():
                     loss2 = self.criterion1(output_, tar.long())
-                    
+                    loss3 = self.criterion2(output_ratios, ratios.float())
                 # loss = loss1 + loss2 + loss3
-                loss = loss1 + loss3
+                loss = loss1
                 losses1.update(loss1)
                 losses2.update(loss2)
                 losses3.update(loss3)
@@ -199,6 +199,7 @@ class Trainer:
         self.writer_kappa.add_scalar('train', self.train_metric.kappa.get(), epoch)
         self.writer_acc.add_scalar('train/train_loss', losses.avg, epoch)
         self.writer_acc.add_scalar('train/train_lr', self.get_lr(), epoch)
+        self.writer_acc.add_scalar('train/ratio_loss', losses3.avg, epoch)
 
     def validation(self, epoch):
 
@@ -247,19 +248,20 @@ class Trainer:
                     # output_tmp = output_tmp.permute(2, 3, 0, 1)
                     # output = output_tmp * dynamic.float()
 
+                    self.visualize_batch_image(img, tar, output, x_weights, epoch, idx)
                     # self.visualize_batch_image(img, x_weights, tar, output, epoch, idx)
                 else:
                     output = self.net(img)
                     loss = self.criterion1(output, tar.long())
                     losses.update(loss)
 
-                    self.visualize_batch_image(img, None, tar, output, epoch, idx)
+                    self.visualize_batch_image(img, tar, output, None, epoch, idx)
 
             self.val_metric.pixacc.update(output, tar)
             self.val_metric.miou.update(output, tar)
             self.val_metric.kappa.update(output, tar)
 
-            self.visualize_batch_image(img, tar, output, x_weights, epoch, idx)
+            # self.visualize_batch_image(img, tar, output, None, epoch, idx)
 
             # self.writer_acc.add_scalar('val', self.val_metric.pixacc.get(), (epoch-1) * num_val + idx + 1)
             # self.writer_miou.add_scalar('val', self.val_metric.miou.get()[0], (epoch-1) * num_val + idx + 1)
@@ -295,19 +297,19 @@ class Trainer:
                 kappa=self.val_metric.kappa.get()
             )
             bar.next()
-            if self.args.use_threshold:
-                if idx == rand_idx:
-                    print_label = ratios[0]
-                    print_pred = F.softmax(output_ratios, dim=1)
-                if idx + 1 == len(self.val_loader):
-                    print()
-                    pprint(print_label)
-                    pprint(print_pred[0])
-                    xx = random.randint(0, 255)
-                    yy = random.randint(0, 255)
-                #     ratios_ = F.softmax(ratios, dim=1)
-                #     pprint(output_[0, :, xx, yy])
-                    print(x_weights[0, :, xx, yy], (x_weights[0] < 0).sum())
+            # if self.args.use_threshold:
+            #     if idx == rand_idx:
+            #         print_label = ratios[0]
+            #         print_pred = F.softmax(output_ratios, dim=1)
+            #     if idx + 1 == len(self.val_loader):
+            #         print()
+            #         pprint(print_label)
+            #         pprint(print_pred[0])
+            #         xx = random.randint(0, 255)
+            #         yy = random.randint(0, 255)
+            #     #     ratios_ = F.softmax(ratios, dim=1)
+            #     #     pprint(output_[0, :, xx, yy])
+            #         print(x_weights[0, :, xx, yy], (x_weights[0] < 0).sum())
                 #     pprint((output - output_)[0, :, xx, yy])
                 #     # atten = (x_weights.expand(output.shape).permute(2, 3, 0, 1) * ratios_).permute(2, 3, 0, 1) * output_[output_ > 0].mean()
                 #     # pprint(atten[0, :, xx, yy])
@@ -327,6 +329,7 @@ class Trainer:
         self.writer_miou.add_scalar('val', self.val_metric.miou.get()[0], epoch)
         self.writer_kappa.add_scalar('val', self.val_metric.kappa.get(), epoch)
         self.writer_acc.add_scalar('val/val_loss', losses.avg, epoch)
+        self.writer_acc.add_scalar('val/ratio_loss', losses3.avg, epoch)
 
         if epoch == self.args.epochs:
             self.writer_acc.close()

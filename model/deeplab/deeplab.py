@@ -137,22 +137,50 @@ class ASPP(nn.Module):
         return self.aspp_out(all_aspp)
 
 
-class Pred_Fore_Rate(nn.Module):
+class Pred_Ratios(nn.Module):
     def __init__(self):
         super().__init__()
         self.conv = nn.Sequential(
-            nn.Conv2d(512, 16, 3, padding=1),
-            nn.BatchNorm2d(16),
+            nn.Conv2d(512, NUM_CLASSES, 3, padding=1),
+            nn.BatchNorm2d(NUM_CLASSES),
             nn.LeakyReLU(inplace=True)
         )
         self.pool = nn.AdaptiveAvgPool2d(1)
 
     def forward(self, x):
         x = self.conv(x)
+        # fea_map = x
         x = self.pool(x)
-        x = x.reshape(x.shape[0], x.shape[1])
+        # x = x.reshape(x.shape[0], x.shape[1])
 
         return x
+
+
+class Pred_Fore_Rate(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+
+class Position_Weights(nn.Module):
+    def __init__(self, inplanes):
+        super().__init__()
+        self.conv = nn.Sequential(
+            nn.Conv2d(inplanes, NUM_CLASSES, 3, padding=1),
+            nn.BatchNorm2d(NUM_CLASSES),
+            nn.LeakyReLU(inplace=True),
+            nn.Conv2d(NUM_CLASSES, 1, 3, padding=1),
+            nn.BatchNorm2d(1),
+            nn.LeakyReLU(inplace=True)
+            )
+        self.out_conv = nn.Conv2d(1, 1, 1)
+
+    def forward(self, x, feats):
+        x = self.conv(x)
+        # x = torch.cat([x, x_weights], dim=1)
+        # x = x + x_weights
+        x = self.out_conv(x)
+        x = torch.sigmoid(x)
+        return x * feats, x
 
 
 class DeepLabV3Plus(nn.Module):
@@ -178,15 +206,10 @@ class DeepLabV3Plus(nn.Module):
             nn.ReLU(inplace=True),
             nn.Conv2d(256, num_classes, 1, bias=False),
         )
-        self.ratios = Pred_Fore_Rate()
-        self.weight_conv2 = nn.Sequential(
-            nn.Conv2d(320, 1, 1),
-            # nn.BatchNorm2d(1),
-            # nn.LeakyReLU(inplace=True),
-            # nn.Conv2d(1, 1, 3, padding=1)
-            )
+        self.ratios = Pred_Ratios()
+        self.posi_conv =Position_Weights(4)
         self.sigmoid = nn.Sigmoid()
-        # self.fine_tuning = nn.Conv2d(num_classes, num_classes, 1)
+
         self.use_threshold = use_threshold
 
     def forward(self, x):
@@ -200,14 +223,6 @@ class DeepLabV3Plus(nn.Module):
                                     size=size,
                                     mode='bilinear',
                                     align_corners=True)
-            x_weights = torch.cat([low_level_features, x1], dim=1)
-            x_weights = F.interpolate(x_weights,
-                              scale_factor=2,
-                              mode='bilinear',
-                              align_corners=True)
-            x_weights = self.weight_conv2(x_weights)
-            # x_weights = self.sigmoid(x_weights) * 2 - 1
-            # print((x_weights < 0).sum())
 
             low_level_features = self.low_level_conv(low_level_features)
             out = torch.cat((aspp_out, low_level_features), dim=1)
@@ -217,14 +232,9 @@ class DeepLabV3Plus(nn.Module):
                                 mode='bilinear',
                                 align_corners=True)
 
-            ratios_ = ratios.clone().detach()
-            ratios_ = F.softmax(ratios_, dim=1)
+            posi_feat, x_weights = self.posi_conv(ori_x, out)
+            output = out * ratios + posi_feat
 
-            output = out.clone().detach()
-            # x_weights = x_weights * output.std()
-            atten = (x_weights.expand(output.shape).permute(2, 3, 0, 1) * ratios_).permute(2, 3, 0, 1) * output[output > 0].mean()
-            # atten = atten / atten.std()  * output.std()
-            output = out + atten
         else:
             aspp_out = self.aspp(x)
             aspp_out = F.interpolate(aspp_out,
