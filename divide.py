@@ -21,10 +21,42 @@ import torch.utils.data
 from torch.utils.data import DataLoader
 import torch.optim
 import numpy as np 
+from thop import profile, clever_format
 
+
+class Model(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.model = torch.load('/home/grey/datasets/rssrai/results/pspnet-none-2convs/pspnet-resnet50_True_False.pth')
+
+    def forward(self, x):
+        ori_x = x
+        size = (x.shape[2], x.shape[3])
+        x, x_ = self.model.backbone(x)
+
+        ratios = self.model.ratios(x)
+
+        x = self.model.ppm(x)
+        x = self.model.ppm_conv(x)
+        x = self.model.classes_conv(x)
+
+        x = F.interpolate(x,
+                            size=size,
+                            mode='bilinear',
+                            align_corners=True)
+
+        out = self.model.out_conv(x)
+
+        # x_weights = self.weight_conv(x)
+        ratios_ = torch.sigmoid(ratios)
+        posi_feat, x_weights = self.model.position_conv(ori_x, out)
+
+        output = out * ratios_ * posi_feat
+        ratios = ratios.reshape(x.shape[0], x.shape[1])
+        return (output, out, x_weights, ratios)
 
 class Tester:
-    def __init__(self, Args, param_path, save_path, batch_size, use_threshold):
+    def __init__(self, Args, save_path, batch_size, use_threshold):
         self.args = Args()
         self.batch_size = batch_size
         self.use_threshold = use_threshold
@@ -33,7 +65,7 @@ class Tester:
         self.num_classes = self.test_set.NUM_CLASSES
         self.test_loader = DataLoader(self.test_set, batch_size=self.batch_size, shuffle=False, num_workers=8)
 
-        self.net = torch.load(param_path)
+        self.net = Model()
         self.criterion1 = torch.nn.CrossEntropyLoss().cuda()
         self.criterion2 = SoftCrossEntropyLoss().cuda()
 
@@ -46,75 +78,6 @@ class Tester:
                                 miou=metrics.MeanIoU(self.num_classes),
                                 kappa=metrics.Kappa(self.num_classes))
 
-    # def testing(self):
-    #     print('length of test set:', len(self.test_set))
-
-    #     batch_time = AverageMeter()
-    #     losses1 = AverageMeter()
-    #     losses2 = AverageMeter()
-    #     losses = AverageMeter()
-    #     starttime = time.time()
-
-    #     if isinstance(self.net, torch.nn.DataParallel):
-    #         self.net = self.net.module
-
-    #     self.net.eval()
-
-    #     num_test = len(self.test_loader)
-    #     bar = Bar('testing', max=num_test)
-
-    #     for idx, [img, img_file] in enumerate(self.test_loader):
-    #         if self.args.cuda:
-    #             img = img.float().cuda()
-    #         with torch.no_grad():
-    #             if self.use_threshold:
-    #                 [output, output_ratios] = self.net(img)
-    #             else:
-    #                 output = self.net(img)
-
-    #         # loss1 = self.criterion1(output, tar.long())
-    #         # loss2 = self.criterion2(output_ratios, ratios.float())
-    #         # loss = loss1 + loss2
-    #         # losses1.update(loss1)
-    #         # losses2.update(loss2)
-    #         # losses.update(loss)
-
-    #         if self.use_threshold:
-    #             output_tmp = F.softmax(output, dim=1)
-    #             output_tmp = output_tmp.permute(2, 3, 0, 1)
-    #             output_ratios = F.softmax(output_ratios, dim=1)
-    #             dynamic = output_tmp > (1 - output_ratios) / (self.num_classes - 1)
-    #             dynamic = dynamic.permute(2, 3, 0, 1)
-    #             output_tmp = output_tmp.permute(2, 3, 0, 1)
-    #             output = output_tmp * dynamic.float()
-
-    #         # self.test_metric.pixacc.update(output, tar)
-    #         # self.test_metric.miou.update(output, tar)
-    #         # self.test_metric.kappa.update(output, tar)
-
-    #         self.save_image(output, img_file)
-
-    #         batch_time.update(time.time() - starttime)
-    #         starttime = time.time()
-
-    #         bar.suffix = '''({batch}/{size}) Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} |
-    #                      '''.format(
-    #                         #  Loss:{loss:.4f},loss1:{loss1:.4f},loss2:{loss2:.4f} | Acc: {Acc: .4f} | mIoU: {mIoU: .4f} |'''.format(
-    #             batch=idx + 1,
-    #             size=num_test,
-    #             bt=batch_time.avg,
-    #             total=bar.elapsed_td,
-    #             eta=bar.eta_td,
-    #             # loss=losses.avg,
-    #             # loss1=losses1.avg,
-    #             # loss2=losses2.avg,
-    #             # mIoU=self.test_metric.miou.get(),
-    #             # Acc=self.test_metric.pixacc.get(),
-    #         )
-    #         bar.next()
-    #     bar.finish()
-    #     print('testing:')
-    #     print(f"[numImages: {num_test * self.batch_size}] | testing Loss: {losses.avg:.4f}")
 
     def testing(self):
 
@@ -228,22 +191,22 @@ class Tester:
             # x_weights.save(os.path.join(self.final_save_path, img_file[0].replace('.npy', '_ratios.tif')))
 
 
-# def test():
-#     save_result_path = '/home/arron/dataset/rssrai_grey/results/tmp_output'
-#     param_path = '/home/arron/Documents/grey/paper/model_saving/dt_resunet-resnet50-0210_bast_pred.pth'
-#     tester = Tester(Args, param_path, save_result_path, 16, use_threshold=True)
-
-#     print("==> Start testing")
-#     tester.testing()
 
 def test():
-    save_result_path = '/home/grey/datasets/rssrai/results/deeplab-thres'
-    param_path = '/home/grey/datasets/rssrai/results/deeplab-thres/deeplab-resnet50_True_False.pth'
-    # param_path = '/home/grey/Documents/rssrai_model_saving/pspnet-resnet50_False_False.pth'
-    torch.load(param_path)
-    tester = Tester(Args, param_path, save_result_path, 1, use_threshold=True)
+    save_result_path = '/home/grey/datasets/rssrai/results/pspnet-none-2convs'
+    tester = Tester(Args, save_result_path, 1, use_threshold=True)
 
-    print("==> Start testing")
+    # print("==> Start testing")
     tester.testing()
 
-test()
+# test()
+def count():
+    # model = torch.load('/home/grey/datasets/rssrai/results/pspnet-none-2convs/pspnet-resnet50_True_False.pth')
+    model = torch.load('/home/grey/datasets/rssrai/results/deeplab-base/deeplab-resnet50_False_False.pth')
+
+    inputs = torch.randn(1, 4, 256, 256).cuda()
+    flops, params = profile(model, inputs=(inputs,), verbose=True)
+    flops, params = clever_format([flops, params], "%.3f")
+    print(flops, params)
+
+count()

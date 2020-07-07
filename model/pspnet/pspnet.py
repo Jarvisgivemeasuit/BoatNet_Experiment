@@ -3,6 +3,7 @@ import torch.nn as nn
 from torch.autograd import Variable
 import numpy as np
 from torchsummary import summary
+from thop import profile
 
 from . import torchvision_resnet
 from .pspnet_utils import initialize_weights
@@ -187,10 +188,10 @@ class Position_Weights(nn.Module):
         # x = torch.cat([x, x_weights], dim=1)
         # x = x + x_weights
         x = self.out_conv(x)
-        x = F.interpolate(x,
-                    size=feats.shape[2:],
-                    mode='bilinear',
-                    align_corners=True)
+        # x = F.interpolate(x,
+        #             size=feats.shape[2:],
+        #             mode='bilinear',
+        #             align_corners=True)
         x = torch.sigmoid(x)
         return x * feats, x
 
@@ -220,7 +221,7 @@ class PSPNet(nn.Module):
             nn.Conv2d(1, 1, 1)
             )
 
-        self.position_conv = Position_Weights(512)
+        self.position_conv = Position_Weights(4)
         self.use_threshold = use_threshold
 
     def forward(self, x):
@@ -243,9 +244,10 @@ class PSPNet(nn.Module):
 
             # x_weights = self.weight_conv(x)
             ratios_ = torch.sigmoid(ratios)
-            posi_feat, x_weights = self.position_conv(x_, out)
+            posi_feat, x_weights = self.position_conv(ori_x, out)
 
-            output = out * ratios_ + posi_feat
+            output = out * ratios_ * posi_feat
+            # output = posi_feat
             ratios = ratios.reshape(x.shape[0], x.shape[1])
 
             # ratios_ = ratios.clone().detach()
@@ -294,5 +296,5 @@ class PSPNet(nn.Module):
         for param in self.backbone.parameters():
             param.requires_grad = True
 
-# net = Dt_PSPNet(4, 16, 'resnet50', False, False)
+# net = PSPNet(4, 16, 'resnet50', False, False).cuda()
 # summary(net.cuda(), (4, 256, 256))

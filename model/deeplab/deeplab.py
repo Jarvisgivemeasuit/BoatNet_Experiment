@@ -233,7 +233,7 @@ class DeepLabV3Plus(nn.Module):
                                 align_corners=True)
 
             posi_feat, x_weights = self.posi_conv(ori_x, out)
-            output = out * ratios + posi_feat
+            output = out * ratios * posi_feat
 
         else:
             aspp_out = self.aspp(x)

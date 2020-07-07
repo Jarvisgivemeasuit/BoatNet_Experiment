@@ -26,5 +26,5 @@ class Args:
         self.apex = True
 
         self.vis_image_dir = '/home/grey/datasets/rssrai/vis_image/'
-        self.board_dir = 'pspnet_feat3'
+        self.board_dir = 'pspnet-spatial'
         # self.vis_image_dir = '/home/arron/Documents/grey/paper/vis_image/'

@@ -306,7 +306,7 @@ class UNet(nn.Module):
 
             x_out = self.outconv(x_out)
             output, x_weights = self.posi_conv(ori_x, x_out)
-            output = x_out * ratios + output
+            output = x_out * ratios * output
 
         else:
             x = self.up1(x4, x3)
