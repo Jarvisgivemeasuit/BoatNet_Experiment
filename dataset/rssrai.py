@@ -59,23 +59,10 @@ class Rssrai(Dataset):
     def __getitem__(self, idx):
         return self.load_numpy(idx, self._mode)
 
-    def load_test_numpy(self, idx):
-        image = np.load(os.path.join(self._image_dir, self._data_list[idx]))
-        mask = np.load(os.path.join(self._label_dir, self._data_list[idx]))
-        ratios = np.load(os.path.join(self._ratios_dir, self._data_list[idx]))
-
-        sample = {'image': image, 'label': mask}
-        sample = self._test_enhance(sample)
-
-        sample['image'] = sample['image'].transpose((2, 0, 1))
-        sample['ratios'] = np.array(ratios[:, 0])
-        sample['file'] = self._data_list[idx]
-        return sample
-
     def load_numpy(self, idx, mode):
         image = np.load(os.path.join(self._image_dir, self._data_list[idx]))
         mask = np.load(os.path.join(self._label_dir, self._data_list[idx]))
-        ratios = np.load(os.path.join(self._ratios_dir, self._data_list[idx]))
+        # ratios = np.load(os.path.join(self._ratios_dir, self._data_list[idx]))
         sample = {'image': image, 'label': mask}
         if mode == 'train':
             sample = self._train_enhance(sample)
@@ -83,7 +70,7 @@ class Rssrai(Dataset):
             sample = self._valid_enhance(sample)
 
         sample['image'] = sample['image'].transpose((2, 0, 1))
-        sample['ratios'] = np.array(ratios[:, 0])
+        # sample['ratios'] = np.array(ratios[:, 0])
         sample['file'] = self._data_list[idx]
 
         return sample

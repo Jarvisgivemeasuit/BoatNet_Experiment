@@ -69,7 +69,7 @@ std = (0.25425667, 0.25164987, 0.23583648, 0.2307136)
 NUM_CLASSES = 16
 
 
-class Path: # 租借服务器路径
+class Path:
     @staticmethod
     def get_root_path(dataset_name):
         if dataset_name == 'rssrai_grey':

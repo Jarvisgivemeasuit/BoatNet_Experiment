@@ -3,7 +3,7 @@ import os
 class Args:
 
     def __init__(self):
-        self.tr_batch_size = 24
+        self.tr_batch_size = 28
         self.vd_batch_size = 1
 
         self.num_workers = 8
@@ -26,5 +26,4 @@ class Args:
         self.apex = True
 
         self.vis_image_dir = '/home/grey/datasets/rssrai/vis_image/'
-        self.board_dir = 'pspnet-spatial'
-        # self.vis_image_dir = '/home/arron/Documents/grey/paper/vis_image/'
+        self.board_dir = 'pspnet_dpa'

@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from PIL import Image
 sys.path.append('../')
 
-from dataset import rssrai, rssrai2
+from dataset import rssrai, rssrai2, gid
 
 import torch
 from torch import nn
@@ -18,69 +18,40 @@ def get_labels(label_number):
     """
     :return: (19 , 3)
     """
-    label_19 = np.array([
-        [128, 64, 128],
-        [244, 35, 232],
-        [70, 70, 70],
-        [102, 102, 156],
-        [190, 153, 153],
-        [153, 153, 153],
-        [250, 170, 30],
-        [220, 220, 0],
-        [107, 142, 35],
-        [152, 251, 152],
-        [0, 130, 180],
-        [220, 20, 60],
-        [255, 0, 0],
-        [0, 0, 142],
-        [0, 0, 70],
-        [0, 60, 100],
-        [0, 80, 100],
-        [0, 0, 230],
-        [119, 11, 32]])
+    label_16 = np.array([[200, 0, 0],
+                       [250, 0, 150],
+                       [200, 150, 150],
+                       [250, 150, 150],
+                       [0, 200, 0],
+                       [150, 250, 0],
+                       [150, 200, 150],
+                       [200, 0, 200],
+                       [150, 0, 250],
+                       [150, 150, 250],
+                       [250, 200, 0],
+                       [200, 200, 0],
+                       [0, 0, 200],
+                       [0, 150, 200],
+                       [0, 200, 250],
+                       [0, 0, 0]])
+    # label_16 = np.array([[0, 200, 0],
+    #                    [150, 250, 0],
+    #                    [150, 200, 150],
+    #                    [200, 0, 200],
+    #                    [150, 0, 250],
+    #                    [150, 150, 250],
+    #                    [250, 200, 0],
+    #                    [200, 200, 0],
+    #                    [200, 0, 0],
+    #                    [250, 0, 150],
+    #                    [200, 150, 150],
+    #                    [250, 150, 150],
+    #                    [0, 0, 200],
+    #                    [0, 150, 200],
+    #                    [0, 200, 250],
+    #                    [0, 0, 0]])
 
-    label_21 = np.array([
-        [0, 0, 0],
-        [128, 0, 0],
-        [0, 128, 0],
-        [128, 128, 0],
-        [0, 0, 128],
-        [128, 0, 128],
-        [0, 128, 128],
-        [128, 128, 128],
-        [64, 0, 0],
-        [192, 0, 0],
-        [64, 128, 0],
-        [192, 128, 0],
-        [64, 0, 128],
-        [192, 0, 128],
-        [64, 128, 128],
-        [192, 128, 128],
-        [0, 64, 0],
-        [128, 64, 0],
-        [0, 192, 0],
-        [128, 192, 0],
-        [0, 64, 128]])
-
-    label_16 = np.array([[0, 200, 0],
-                         [150, 250, 0],
-                         [150, 200, 150],
-                         [200, 0, 200],
-                         [150, 0, 250],
-                         [150, 150, 250],
-                         [250, 200, 0],
-                         [200, 200, 0],
-                         [200, 0, 0],
-                         [250, 0, 150],
-                         [200, 150, 150],
-                         [250, 150, 150],
-                         [0, 0, 200],
-                         [0, 150, 200],
-                         [0, 200, 250],
-                         [0, 0, 0]])
-
-
-    label_colors = {19: label_19, 21: label_21, 16: label_16}
+    label_colors = {16: label_16}
     return label_colors[label_number]
 
 
@@ -89,8 +60,10 @@ def make_dataset(dataset):
         train_set = rssrai.Rssrai(mode='train')
         val_set = rssrai.Rssrai(mode='test')
     else:
-        train_set = rssrai2.Rssrai(mode='train')
-        val_set = rssrai2.Rssrai(mode='test')
+        train_set = gid.GID(mode='train')
+        val_set = gid.GID(mode='val')
+
+    
     return train_set, val_set, train_set.NUM_CLASSES
 
 
@@ -138,13 +111,6 @@ class AverageMeter:
         self.sum += val * n
         self.count += n
         self.avg = self.sum / self.count
-
-
-class TensorboardSummary:
-    def __init__(self, directory):
-        self.directory = directory
-        self.writer = SummaryWriter(logdir=os.path.join(self.directory))
-        plt.axis('off')
 
 
 # 将output拼接成完整的图片
