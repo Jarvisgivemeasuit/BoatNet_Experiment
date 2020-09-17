@@ -1,5 +1,6 @@
 import torch
 import numpy as np
+from sklearn.metrics import f1_score as fs
 
 class PixelAccuracy:
     def __init__(self, ignore_index=-1, eps=1e-7):
@@ -101,3 +102,38 @@ class Kappa:
         self.pre_vec = np.zeros(self.num)
         self.cor_vec = np.zeros(self.num)
         self.tar_vec = np.zeros(self.num)
+
+
+class F1:
+    def __init__(self):
+        self.score = 0
+        self.num = 0
+        self.all = np.zeros(16)
+        self.map = None
+        self.map_tar = None
+
+    def update(self, output, target):
+        output = torch.argmax(output, dim=1).reshape(-1).cpu() 
+        target = target.reshape(-1).cpu()
+        # output = list(output)
+        # target = list(target)
+        self.score += fs(output, target, average='macro')
+        self.num += 1
+        if self.map == None:
+            self.map = output
+        else:
+            self.map = torch.cat([self.map, output])
+        if self.map_tar == None:
+            self.map_tar = target
+        else:
+            self.map_tar = torch.cat([self.map_tar, target])
+
+    def get(self):
+        return self.score / self.num
+
+    def reset(self):
+        self.score = 0
+        self.num = 0
+
+    def get_all(self):
+        return fs(self.map, self.map_tar, average=None)

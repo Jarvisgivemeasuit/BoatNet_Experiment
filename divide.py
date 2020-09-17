@@ -7,12 +7,11 @@ from PIL import Image
 import matplotlib.pyplot as plt
 from collections import namedtuple
 
-sys.path.append("/home/arron/Documents/grey/paper/experiment")
-
 from utils.args import Args
 from utils.utils import *
 from model import get_model, save_model
 from dataset.rssrai import Rssrai
+from dataset.gid import GID
 import utils.metrics as metrics
 
 import torch
@@ -27,7 +26,7 @@ from thop import profile, clever_format
 class Model(nn.Module):
     def __init__(self):
         super().__init__()
-        self.model = torch.load('/home/grey/datasets/rssrai/results/pspnet-none-2convs/pspnet-resnet50_True_False.pth')
+        self.model = torch.load('/data/grey/dataset/GID15/result/pspnet-dpa/pspnet-resnet50.pth')
 
     def forward(self, x):
         ori_x = x
@@ -51,7 +50,7 @@ class Model(nn.Module):
         ratios_ = torch.sigmoid(ratios)
         posi_feat, x_weights = self.model.position_conv(ori_x, out)
 
-        output = out * ratios_ * posi_feat
+        output = out * ratios_
         ratios = ratios.reshape(x.shape[0], x.shape[1])
         return (output, out, x_weights, ratios)
 
@@ -61,7 +60,7 @@ class Tester:
         self.batch_size = batch_size
         self.use_threshold = use_threshold
 
-        self.test_set = Rssrai(mode='test')
+        self.test_set = GID(mode='val')
         self.num_classes = self.test_set.NUM_CLASSES
         self.test_loader = DataLoader(self.test_set, batch_size=self.batch_size, shuffle=False, num_workers=8)
 
@@ -101,29 +100,20 @@ class Tester:
         self.net.eval()
 
         for idx, sample in enumerate(self.test_loader):
-            img, tar, ratios, img_file = sample['image'], sample['label'], sample['ratios'], sample['file']
+            img, tar, img_file = sample['image'], sample['label'], sample['file']
 
             if self.args.cuda:
-                img, tar, ratios = img.cuda(), tar.cuda(), ratios.cuda()
+                img, tar = img.cuda(), tar.cuda()
             with torch.no_grad():
                 if self.use_threshold:
                     [output, output_, x_weights, output_ratios] = self.net(img)
                     loss1 = self.criterion1(output, tar.long())
                     loss2 = self.criterion1(output_, tar.long())
-                    loss3 = self.criterion2(output_ratios, ratios.float())
-                    loss = loss1 + loss2 + loss3
+                    loss = loss1 + loss2
                     losses1.update(loss1)
                     losses2.update(loss2)
-                    losses3.update(loss3)
                     losses.update(loss)
 
-                    # output_tmp = F.softmax(output, dim=1)
-                    # output_tmp = output.permute(2, 3, 0, 1)
-                    # output_ratios = F.softmax(output_ratios, dim=1)
-                    # dynamic = output_tmp > (1 - output_ratios) / (self.num_classes - 1)
-                    # dynamic = dynamic.permute(2, 3, 0, 1)
-                    # output_tmp = output_tmp.permute(2, 3, 0, 1)
-                    # output = output_tmp * dynamic.float()
                 else:
                     output = self.net(img)
                     loss = self.criterion1(output, tar.long())
@@ -142,7 +132,10 @@ class Tester:
             self.val_metric.miou.update(output, tar)
             self.val_metric.kappa.update(output, tar)
             if self.use_threshold:
-                self.save_image(output, img_file, x_weights)
+                # self.save_image(output, img_file, x_weights)
+                output = F.softmax(output, dim=1)
+                output = output.cpu().numpy()
+                np.save(os.path.join(self.final_save_path, img_file[0].replace('.tif', '_ratios')), output)
             else:
                 self.save_image(output, img_file)
 
@@ -193,7 +186,7 @@ class Tester:
 
 
 def test():
-    save_result_path = '/home/grey/datasets/rssrai/results/pspnet-none-2convs'
+    save_result_path = '/data/grey/dataset/GID15/result/pspnet-channel/factor'
     tester = Tester(Args, save_result_path, 1, use_threshold=True)
 
     # print("==> Start testing")
@@ -209,4 +202,4 @@ def count():
     flops, params = clever_format([flops, params], "%.3f")
     print(flops, params)
 
-count()
+test()

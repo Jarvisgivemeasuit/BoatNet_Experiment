@@ -3,7 +3,7 @@ import os
 class Args:
 
     def __init__(self):
-        self.tr_batch_size = 24
+        self.tr_batch_size = 28
         self.vd_batch_size = 1
 
         self.num_workers = 8
@@ -19,12 +19,11 @@ class Args:
         self.lr = 0.015
         self.no_val = False
 
-        self.gpu_ids = [0]
-        self.gpu_id = '0'
+        self.gpu_ids = [0, 1]
+        self.gpu_id = '0, 1'
         os.environ['CUDA_VISIBLE_DEVICES'] = self.gpu_id
         self.cuda = torch.cuda.is_available()
         self.apex = True
 
         self.vis_image_dir = '/home/grey/datasets/rssrai/vis_image/'
-        self.board_dir = 'pspnet-spatial'
-        # self.vis_image_dir = '/home/arron/Documents/grey/paper/vis_image/'
+        self.board_dir = 'pspnet_dpa'

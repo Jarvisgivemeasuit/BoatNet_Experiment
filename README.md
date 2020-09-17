@@ -1,3 +1,2 @@
-# DtNet_Experiment
-
-A neural network model of multi land type segmentation based on dynamic threshold
+# DPA-Net
+A neural network model of multi land type segmentation based on self-attention mechanism.

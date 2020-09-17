@@ -33,6 +33,7 @@ class Resnet(nn.Module):
         if in_channels != 3:
             self.layer0 = nn.Sequential(
                 nn.Conv2d(in_channels, 64, 3, stride=2, padding=1, bias=False),
+                # nn.Conv2d(in_channels, 64, 3, padding=1, bias=False),
                 nn.BatchNorm2d(64),
                 nn.LeakyReLU(inplace=True),
                 # nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
@@ -61,12 +62,13 @@ class Resnet(nn.Module):
     def forward(self, x):
         x = self.layer0(x)
         x = self.layer1(x)
-        x_ = self.layer2(x)
-        x = self.layer3(x_)
+        x_ = x
+        x = self.layer2(x)
+        x = self.layer3(x)
         x = self.layer4(x)
         output = self.chd(x)
 
-        return output,x_
+        return output, x_
 
     def change_dilation(self, params):
         assert isinstance(params, (tuple, list))
@@ -158,14 +160,32 @@ class Pred_Ratios(nn.Module):
         self.conv = nn.Sequential(
             nn.Conv2d(512, NUM_CLASSES, 3, padding=1),
             nn.BatchNorm2d(NUM_CLASSES),
-            nn.LeakyReLU(inplace=True)
+            nn.LeakyReLU(inplace=True),
+            # nn.Conv2d(NUM_CLASSES, NUM_CLASSES, 3, padding=1),
+            # nn.BatchNorm2d(NUM_CLASSES),
+            # nn.LeakyReLU(inplace=True)
         )
         self.pool = nn.AdaptiveAvgPool2d(1)
+        # self.linear = nn.Sequential(
+        #     nn.Linear(NUM_CLASSES, 8),
+        #     nn.ReLU(inplace=True),
+        #     nn.Linear(8, NUM_CLASSES)
+        # )
+        self.conv2 = nn.Sequential(
+            nn.Conv2d(NUM_CLASSES, NUM_CLASSES, 1),
+            nn.BatchNorm2d(NUM_CLASSES),
+            nn.ReLU(inplace=True))
+
 
     def forward(self, x):
         x = self.conv(x)
         # fea_map = x
         x = self.pool(x)
+        # x = self.conv2(x)
+        # shape = x.shape
+        # x = x.reshape(x.shape[0], -1)
+        # x = self.linear(x)
+        # x = x.reshape(shape)
         # x = x.reshape(x.shape[0], x.shape[1])
 
         return x
@@ -177,21 +197,30 @@ class Position_Weights(nn.Module):
             nn.Conv2d(inplanes, NUM_CLASSES, 3, padding=1),
             nn.BatchNorm2d(NUM_CLASSES),
             nn.LeakyReLU(inplace=True),
-            nn.Conv2d(NUM_CLASSES, 1, 3, padding=1),
-            nn.BatchNorm2d(1),
+            nn.Conv2d(NUM_CLASSES, NUM_CLASSES, 3, padding=1),
+            nn.BatchNorm2d(NUM_CLASSES),
             nn.LeakyReLU(inplace=True)
             )
-        self.out_conv = nn.Conv2d(1, 1, 1)
+        # self.squeeze = nn.Sequential(
+        #     nn.Conv2d(NUM_CLASSES, NUM_CLASSES, 3, stride=2, padding=1),
+        #     nn.BatchNorm2d(NUM_CLASSES),
+        #     nn.LeakyReLU(inplace=True),
+        # )
+        self.out_conv = nn.Sequential(
+            nn.Conv2d(NUM_CLASSES, NUM_CLASSES, 1),
+            nn.BatchNorm2d(NUM_CLASSES),
+            nn.ReLU(inplace=True))
 
     def forward(self, x, feats):
+        size = (x.shape[2], x.shape[3])
         x = self.conv(x)
-        # x = torch.cat([x, x_weights], dim=1)
-        # x = x + x_weights
         x = self.out_conv(x)
-        # x = F.interpolate(x,
-        #             size=feats.shape[2:],
-        #             mode='bilinear',
-        #             align_corners=True)
+        # x = self.squeeze(x)
+        # x = F.interpolate(x, 
+        #                   size=size,
+        #                   mode='bilinear',
+        #                   align_corners=True)
+
         x = torch.sigmoid(x)
         return x * feats, x
 
@@ -230,7 +259,6 @@ class PSPNet(nn.Module):
         x, x_ = self.backbone(x)
         if self.use_threshold:
             ratios = self.ratios(x)
-
             x = self.ppm(x)
             x = self.ppm_conv(x)
             x = self.classes_conv(x)
@@ -246,29 +274,10 @@ class PSPNet(nn.Module):
             ratios_ = torch.sigmoid(ratios)
             posi_feat, x_weights = self.position_conv(ori_x, out)
 
-            output = out * ratios_ * posi_feat
+            output = out * ratios_ + posi_feat
             # output = posi_feat
             ratios = ratios.reshape(x.shape[0], x.shape[1])
 
-            # ratios_ = ratios.clone().detach()
-            # ratios_ = F.softmax(ratios, dim=1)
-
-            # # output = out.clone().detach()
-            # mask = torch.argmax(out1, dim=1)
-            # output_ratios = torch.zeros([out1.shape[0], out1.shape[1]]).cuda()
-            # for cat in range(NUM_CLASSES):
-            #     output_ratios[:, cat] = (mask == cat).sum(dim=(1, 2)).float() / float(out1.shape[2] * out1.shape[3])
-            # output_ratios = output_ratios.reshape(ratios.shape)
-
-            # ratios_ = F.interpolate(ratios_,
-            #                         size=size,
-            #                         mode='nearest')
-            # output_ratios = F.interpolate(output_ratios,
-            #                         size=size,
-            #                         mode='nearest')
-            # dist = torch.log(output_ratios * torch.exp(ratios_).sum(dim=1).reshape(ratios_.shape[0], 1, ratios_.shape[2], ratios_.shape[3]).expand(ratios_.shape) + 1e-4)
-            # output = out1 +  (ratios_ - dist) * out2
-            # output = output + (x_weights.expand(output.shape).permute(2, 3, 0, 1) * ratios_).permute(2, 3, 0, 1)
         else:
             x = self.ppm(x)
             x = self.ppm_conv(x)
