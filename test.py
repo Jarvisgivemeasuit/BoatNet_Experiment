@@ -30,6 +30,7 @@ class Tester:
 
         # self.test_set = Rssrai(mode='test')
         self.test_set = GID(mode='val')
+
         self.num_classes = self.test_set.NUM_CLASSES
         self.test_loader = DataLoader(self.test_set, batch_size=self.batch_size, shuffle=False, num_workers=8)
 
@@ -93,11 +94,16 @@ class Tester:
             self.val_metric.miou.update(output, tar)
             # self.val_metric.kappa.update(output, tar)
             self.val_metric.F1.update(output, tar)
+<<<<<<< HEAD
             if self.use_threshold:
                 # self.save_image(output, img_file, x_weights)
                 output = F.softmax(output, dim=1)
                 output = output.cpu().numpy()
                 np.save(os.path.join(self.final_save_path, img_file[0].replace('.tif', '_ratios')), output)
+=======
+            # if self.use_threshold:
+            #     self.save_image(output, img_file, x_weights)
+>>>>>>> d4db40731bd3d03a72ad57184f070548a3848905
             # else:
             #     self.save_image(output, img_file)
 
@@ -145,12 +151,20 @@ class Tester:
 
 
 def test():
+<<<<<<< HEAD
     save_result_path = '/data/grey/dataset/GID15/result/pspnet-dpa/featmap'
     # param_path = '/home/grey/Documents/rssrai_model_saving/pspnet-resnet50_16.pth'
     # param_path = '/home/grey/datasets/GID15/result/pspnet-dpa/pspnet-resnet50.pth'
     param_path = '/data/grey/dataset/GID15/result/pspnet-dpa/pspnet-resnet50.pth'
+=======
+    save_result_path = '/home/grey/datasets/rssrai/results/pspnet-baseline/res100'
+    # save_result_path = '/home/grey/datasets/GID15/result/pspnet-dpa'
+    # param_path = '/home/grey/Documents/rssrai_model_saving/pspnet-resnet50_16.pth'
+    # param_path = '/home/grey/datasets/GID15/result/pspnet-dpa/pspnet-resnet50.pth'
+    param_path = '/home/grey/datasets/rssrai/results/senet/senet-resnet50.pth'
+>>>>>>> d4db40731bd3d03a72ad57184f070548a3848905
     torch.load(param_path)
-    tester = Tester(Args, param_path, save_result_path, 1, use_threshold=True)
+    tester = Tester(Args, param_path, save_result_path, 1, use_threshold=False)
 
     print("==> Start testing")
     tester.testing()

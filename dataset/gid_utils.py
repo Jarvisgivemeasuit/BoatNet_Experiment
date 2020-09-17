@@ -86,9 +86,15 @@ class Path: # 租借服务器路径
     @staticmethod
     def get_root_path(dataset_name):
         if dataset_name == 'rssrai_grey':
+<<<<<<< HEAD
             return '/data/grey/rssrai/'
         elif dataset_name == 'gid15':
             return '/data/grey/GID15/'
+=======
+            return '/home/grey/datasets/rssrai/'
+        elif dataset_name == 'gid15':
+            return '/home/grey/datasets/GID15/'
+>>>>>>> d4db40731bd3d03a72ad57184f070548a3848905
 
 
 class ProcessingPath:
